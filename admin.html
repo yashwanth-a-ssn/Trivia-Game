@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Trivia Admin - Control Panel</title>
+  <link rel="stylesheet" href="style-admin.css">
+  <style>
+    #admin-leaderboard-list {
+      text-align: left;
+      max-height: 300px;
+      overflow-y: auto;
+      background: rgba(0,0,0,0.2);
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+    }
+    .admin-lb-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(245, 197, 66, 0.2);
+    }
+    #admin-podium-preview {
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      gap: 15px;
+      margin-bottom: 20px;
+      padding: 20px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 10px;
+    }
+    .admin-podium-slot {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 10px;
+      border: 1px solid var(--gold);
+      border-radius: 8px;
+      width: 120px;
+    }
+    .nav-btn.active-tab {
+      background: var(--gold);
+      color: black;
+      font-weight: bold;
+    }
+    /* Hidden Scrollbar for Rules */
+    .rules-scroll {
+      overflow-y: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .rules-scroll::-webkit-scrollbar {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<div id="taskbar" class="taskbar hidden">
+  <button id="nav-home" class="nav-btn">Home</button>
+  <button id="nav-rules" class="nav-btn">Rules</button>
+  <button id="nav-teams" class="nav-btn">Teams</button>
+  <button id="nav-r1" class="nav-btn" disabled>Qualifiers</button>
+  <button id="nav-r2" class="nav-btn" disabled>Quarterfinals</button>
+  <button id="nav-r3" class="nav-btn" disabled>Semifinals</button>
+  <button id="nav-r4" class="nav-btn" disabled>Finals</button>
+  <button id="nav-leaderboard" class="nav-btn">Leaderboard</button>
+  <button id="nav-podium" class="nav-btn">Podium</button>
+</div>
+
+<div id="current-tab-indicator" class="tab-indicator">Home</div>
+
+<h1>Trivia Admin Control</h1>
+
+<div id="view-home" class="card">
+  <button id="newGameBtn" style="font-size: 1.5rem; padding: 20px;">New Game</button>
+</div>
+
+<div id="view-rules" class="card hidden">
+  <h2>Game Rules & Scoring</h2>
+  <div class="rules-scroll" style="text-align: left; max-height: 400px; padding: 10px;">
+    <h3>1. Scoring</h3>
+    <ul>
+      <li><strong>Response Values:</strong> Correct reveals earn 1 to 5 points based on popularity.</li>
+      <li><strong>Point Spread:</strong> The most popular response earns 5 points; the least earns 1 point.</li>
+      <li><strong>Total Score:</strong> All points are cumulative throughout the entire tournament.</li>
+    </ul>
+    <h3>2. Tournament Progression</h3>
+    <ul>
+      <li><strong>Qualifiers:</strong> All the Teams</li>
+      <li><strong>Quarterfinals:</strong> Top 8 Teams</li>
+      <li><strong>Semifinals:</strong> Top 4 Teams</li>
+      <li><strong>Finals:</strong> Top 2 Teams</li>
+    </ul>
+    <h3>3. Tie-Breakers</h3>
+    <ul>
+      <li><strong>Match Ties:</strong> Victory is awarded to the team with the highest-point single answer in that match.</li>
+      <li><strong>Tournament Ties:</strong> Decided by the total count of 5-point answers, then by the highest Qualifier score.</li>
+    </ul>
+  </div>
+  <button id="btnDisplayRules" class="display-btn">Display Rules to Audience</button>
+</div>
+
+<div id="view-teams" class="card hidden">
+  <h2>Teams Management</h2>
+  <div id="setup-inputs">
+    <p>Upload <strong>Teams.csv</strong> (First row must be "Teams")</p>
+    <input type="file" id="teamsFile" accept=".csv">
+  </div>
+  <div id="teams-list-admin" style="margin: 15px 0; text-align: left; max-height: 200px; overflow-y: auto;"></div>
+  <button id="btnDisplayTeams" class="display-btn">Display Teams to Audience</button>
+</div>
+
+<div id="view-setup" class="card hidden">
+  <h2 id="setupTitle">Round Setup</h2>
+  <div id="upload-section">
+    <label id="qLabel">Upload Questions CSV (Header: Question,Answer,Points)</label><br>
+    <input type="file" id="questionsFile" accept=".csv">
+  </div>
+  <div id="start-section" class="hidden">
+    <button id="startRoundBtn" style="background: #22c55e; color: white; font-size: 1.2rem;">Start Round</button>
+  </div>
+</div>
+
+<div id="view-match" class="card hidden">
+  <div id="admin-status" style="background: #f5c542; color: #000; padding: 5px; font-weight: bold; margin-bottom: 10px;">ADMIN PREVIEW - NOT ON AUDIENCE</div>
+  <h2 id="matchHeader"></h2>
+  <h3 id="questionText"></h3>
+  <div id="answers"></div>
+  <div class="controls">
+    <button id="btnDisplayMatch" class="display-btn" style="background: #3b82f6; color: white;">Display Match to Audience</button>
+    <button id="nextQuestionBtn">Swap Question</button>
+    <button id="endRoundBtn" style="background: #ff4444; color: white;">Complete Round</button>
+  </div>
+</div>
+
+<div id="view-leaderboard" class="card hidden">
+  <h2>Leaderboard Control</h2>
+  <div id="admin-leaderboard-list"></div>
+  <button id="btnDisplayLeaderboard" class="display-btn">Display Leaderboard to Audience</button>
+</div>
+
+<div id="view-podium" class="card hidden">
+  <h2>Podium Control</h2>
+  <div id="admin-podium-preview"></div>
+  <button id="btnDisplayPodium" class="display-btn">Display Podium to Audience</button>
+</div>
+
+<script src="sync.js"></script>
+<script src="storage.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  let STATE = loadState() || {
+    displayMode: "welcome", 
+    round: 1, teams: [], pairs: [], matchIndex: 0,
+    questionsPool: [], currentQuestion: null, revealed: [], 
+    isMatchLive: false, matchWinner: null, matchScores: [0, 0],
+    matchHighPointAnswerIdx: [null, null]
+  };
+
+  const ROUND_NAMES = { 1: "Qualifiers", 2: "Quarterfinals", 3: "Semifinals", 4: "Finals" };
+  const ADVANCEMENT = { 1: 8, 2: 4, 3: 2, 4: 1 };
+
+  function resetStatusUI() {
+    const status = document.getElementById("admin-status");
+    if(status) {
+      status.textContent = "ADMIN PREVIEW - NOT ON AUDIENCE";
+      status.style.background = "#f5c542";
+    }
+    STATE.isMatchLive = false;
+  }
+
+  const showView = (id, tabName) => {
+    document.querySelectorAll('.card').forEach(c => c.classList.add("hidden"));
+    document.getElementById(id).classList.remove("hidden");
+    document.getElementById("current-tab-indicator").textContent = tabName;
+    
+    if(id === "view-leaderboard") updateAdminLeaderboard();
+    if(id === "view-podium") updateAdminPodium(); 
+
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.classList.toggle('active-tab', btn.textContent === tabName || btn.id.includes(id.split('-')[1]));
+    });
+  };
+
+  function updateAdminLeaderboard() {
+    const list = document.getElementById("admin-leaderboard-list");
+    const sorted = [...STATE.teams].sort((a,b) => b.score - a.score || a.order - b.order);
+    list.innerHTML = sorted.map((t, i) => `
+      <div class="admin-lb-item"><span>#${i+1} ${t.name}</span><strong>${t.score} PTS</strong></div>
+    `).join("");
+  }
+
+  function updateAdminPodium() {
+    const preview = document.getElementById("admin-podium-preview");
+    const sorted = [...STATE.teams].sort((a,b) => b.score - a.score || a.order - b.order);
+    preview.innerHTML = `
+      <div class="admin-podium-slot" style="height: 100px;">
+        <div style="font-size: 1.5rem;">🥈</div>
+        <div style="font-weight: bold;">${sorted[1]?.name || "-"}</div>
+        <div style="font-size: 0.8rem;">${sorted[1]?.score || 0} PTS</div>
+      </div>
+      <div class="admin-podium-slot" style="height: 140px; border-width: 3px;">
+        <div style="font-size: 2rem;">🥇</div>
+        <div style="font-weight: bold;">${sorted[0]?.name || "-"}</div>
+        <div style="font-size: 0.9rem;">${sorted[0]?.score || 0} PTS</div>
+      </div>
+      <div class="admin-podium-slot" style="height: 80px;">
+        <div style="font-size: 1.2rem;">🥉</div>
+        <div style="font-weight: bold;">${sorted[2]?.name || "-"}</div>
+        <div style="font-size: 0.8rem;">${sorted[2]?.score || 0} PTS</div>
+      </div>
+    `;
+  }
+
+  if (STATE.teams.length > 0) {
+    document.getElementById("taskbar").classList.remove("hidden");
+    updateTaskbar();
+    document.getElementById("teams-list-admin").innerHTML = STATE.teams.map(t => `<div>• ${t.name}</div>`).join("");
+    broadcast(STATE);
+  }
+
+  document.getElementById("nav-home").onclick = () => showView("view-home", "Home");
+  document.getElementById("nav-rules").onclick = () => showView("view-rules", "Rules");
+  document.getElementById("nav-teams").onclick = () => showView("view-teams", "Teams");
+  document.getElementById("nav-leaderboard").onclick = () => showView("view-leaderboard", "Leaderboard");
+  document.getElementById("nav-podium").onclick = () => showView("view-podium", "Podium");
+  
+  [1,2,3,4].forEach(r => {
+    document.getElementById(`nav-r${r}`).onclick = () => {
+      if(STATE.round === r) {
+        if (STATE.currentQuestion) showView("view-match", ROUND_NAMES[r]);
+        else showView("view-setup", `${ROUND_NAMES[r]} Setup`);
+      }
+    };
+  });
+
+  document.getElementById("btnDisplayRules").onclick = () => { STATE.displayMode = "rules"; broadcast(STATE); saveState(STATE); };
+  document.getElementById("btnDisplayTeams").onclick = () => { STATE.displayMode = "teams"; broadcast(STATE); saveState(STATE); };
+  document.getElementById("btnDisplayLeaderboard").onclick = () => { STATE.displayMode = "leaderboard"; broadcast(STATE); saveState(STATE); };
+  document.getElementById("btnDisplayPodium").onclick = () => { STATE.displayMode = "podium"; broadcast(STATE); saveState(STATE); };
+
+  document.getElementById("newGameBtn").onclick = () => {
+    clearState();
+    STATE = {
+      displayMode: "welcome", round: 1, teams: [], pairs: [], matchIndex: 0,
+      questionsPool: [], currentQuestion: null, revealed: [], 
+      isMatchLive: false, matchWinner: null, matchScores: [0, 0],
+      matchHighPointAnswerIdx: [null, null]
+    };
+    window.open("audience.html", "_blank");
+    showView("view-teams", "Teams");
+    document.getElementById("taskbar").classList.remove("hidden");
+    document.getElementById("teams-list-admin").innerHTML = "";
+    document.getElementById("start-section").classList.add("hidden");
+    document.getElementById("upload-section").classList.remove("hidden");
+    updateTaskbar();
+    broadcast(STATE);
+    saveState(STATE);
+  };
+
+  document.getElementById("teamsFile").onchange = e => {
+    parseCSV(e.target.files[0], rows => {
+      if (!rows[0] || rows[0][0].trim() !== "Teams") {
+        alert("CRITICAL ERROR: Invalid file. The first row must be 'Teams'. Upload canceled.");
+        e.target.value = ""; return;
+      }
+      const teamData = rows.slice(1).filter(r => r[0] && r[0].trim() !== "");
+      if (teamData.length % 2 !== 0) {
+        alert("Error: Team list must have an EVEN number of teams.");
+        e.target.value = ""; return;
+      }
+      STATE.teams = teamData.map((r, i) => ({ name: r[0].trim(), score: 0, order: i, qualified: true }));
+      document.getElementById("teams-list-admin").innerHTML = STATE.teams.map(t => `<div>• ${t.name}</div>`).join("");
+      document.getElementById("taskbar").classList.remove("hidden");
+      updateTaskbar();
+      saveState(STATE);
+    });
+  };
+
+  document.getElementById("questionsFile").onchange = e => {
+    parseCSV(e.target.files[0], rows => {
+      const header = rows[0].map(h => h.trim()).join(",");
+      if (header !== "Question,Answer,Points") {
+        alert("CRITICAL ERROR: Invalid Question file.\nHeader must be: Question,Answer,Points\nUpload canceled.");
+        e.target.value = ""; return;
+      }
+      const grouped = {};
+      rows.slice(1).forEach(r => {
+        if (r[0] && r[0].trim() !== "") {
+          if (!grouped[r[0]]) grouped[r[0]] = [];
+          grouped[r[0]].push({ text: r[1].trim(), points: parseInt(r[2]) || 0 });
+        }
+      });
+      STATE.questionsPool = Object.entries(grouped).map(([q, a]) => ({ question: q, answers: a }));
+      document.getElementById("upload-section").classList.add("hidden");
+      document.getElementById("start-section").classList.remove("hidden");
+      saveState(STATE);
+    });
+  };
+
+  document.getElementById("startRoundBtn").onclick = () => {
+    STATE.matchIndex = 0;
+    const activeTeams = STATE.teams.filter(t => t.qualified);
+    STATE.pairs = [];
+    for(let i=0; i < activeTeams.length; i+=2) {
+      if(activeTeams[i+1]) STATE.pairs.push([activeTeams[i], activeTeams[i+1]]);
+    }
+    STATE.displayMode = "round-start";
+    broadcast(STATE);
+    prepareMatch();
+  };
+
+  function prepareMatch() {
+    resetStatusUI(); 
+    STATE.matchWinner = null; STATE.matchScores = [0, 0];
+    STATE.matchHighPointAnswerIdx = [null, null];
+    if (STATE.questionsPool.length === 0) return alert("No questions left in pool!");
+    STATE.currentQuestion = STATE.questionsPool.splice(Math.floor(Math.random() * STATE.questionsPool.length), 1)[0];
+    STATE.revealed = [];
+    renderMatch();
+    showView("view-match", ROUND_NAMES[STATE.round]);
+    saveState(STATE);
+  }
+
+  function renderMatch() {
+    const pair = STATE.pairs[STATE.matchIndex];
+    document.getElementById("matchHeader").textContent = `${pair[0].name} vs ${pair[1].name}`;
+    document.getElementById("questionText").textContent = STATE.currentQuestion.question;
+    document.getElementById("answers").innerHTML = STATE.currentQuestion.answers.map((ans, i) => `
+      <div class="answer-row">
+        <span>${ans.text} (${ans.points})</span>
+        <div class="btn-group">
+          <button onclick="award(${i}, 0)">+ ${pair[0].name}</button>
+          <button onclick="award(${i}, 1)">+ ${pair[1].name}</button>
+          <button style="background: #94a3b8" onclick="award(${i}, null)">Empty Reveal</button>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  window.award = (ansIdx, teamIdxInPair) => {
+    if (!STATE.isMatchLive) return alert("Click 'Display Match to Audience' first!");
+    if (STATE.revealed.find(r => r.idx === ansIdx)) return;
+    const points = STATE.currentQuestion.answers[ansIdx].points;
+    const pair = STATE.pairs[STATE.matchIndex];
+    let winnerName = (teamIdxInPair !== null) ? pair[teamIdxInPair].name : "Revealed";
+    if (teamIdxInPair !== null) {
+      STATE.teams.find(t => t.name === winnerName).score += points;
+      STATE.matchScores[teamIdxInPair] += points;
+      const curMax = STATE.matchHighPointAnswerIdx[0] !== null ? STATE.currentQuestion.answers[STATE.matchHighPointAnswerIdx[0]].points : -1;
+      if (points > curMax) STATE.matchHighPointAnswerIdx = [ansIdx, teamIdxInPair];
+    }
+    STATE.revealed.push({ idx: ansIdx, winnerName: winnerName });
+    broadcast(STATE); saveState(STATE);
+
+    if (STATE.revealed.length === STATE.currentQuestion.answers.length) {
+      if (STATE.matchScores[0] > STATE.matchScores[1]) STATE.matchWinner = pair[0].name;
+      else if (STATE.matchScores[1] > STATE.matchScores[0]) STATE.matchWinner = pair[1].name;
+      else STATE.matchWinner = (STATE.matchHighPointAnswerIdx[1] !== null) ? pair[STATE.matchHighPointAnswerIdx[1]].name : "DRAW!";
+      STATE.displayMode = "match-winner";
+      broadcast(STATE); saveState(STATE);
+      setTimeout(() => {
+        if (STATE.matchIndex < STATE.pairs.length - 1) { 
+          STATE.matchIndex++; STATE.displayMode = "leaderboard";
+          broadcast(STATE); prepareMatch(); 
+        } else { 
+          resetStatusUI();
+          alert("Round matches finished! Proceed to the Leaderboard."); 
+        }
+      }, 5000);
+    }
+  };
+
+  document.getElementById("btnDisplayMatch").onclick = () => { 
+    STATE.displayMode = "match"; STATE.isMatchLive = true; 
+    document.getElementById("admin-status").textContent = "LIVE ON AUDIENCE";
+    document.getElementById("admin-status").style.background = "#22c55e";
+    broadcast(STATE); saveState(STATE);
+  };
+
+  document.getElementById("endRoundBtn").onclick = () => {
+    resetStatusUI();
+    const limit = ADVANCEMENT[STATE.round];
+    const sorted = [...STATE.teams].sort((a,b) => b.score - a.score || a.order - b.order);
+    STATE.teams.forEach(t => t.qualified = false);
+    sorted.slice(0, limit).forEach(t => STATE.teams.find(orig => orig.name === t.name).qualified = true);
+    STATE.displayMode = "round-complete";
+    broadcast(STATE); saveState(STATE);
+    setTimeout(() => {
+        if (STATE.round < 4) {
+          STATE.round++; STATE.currentQuestion = null; STATE.questionsPool = [];
+          document.getElementById("upload-section").classList.remove("hidden");
+          document.getElementById("start-section").classList.add("hidden");
+          document.getElementById("questionsFile").value = ""; 
+          showView("view-leaderboard", "Leaderboard");
+        } else showView("view-podium", "Podium");
+        updateTaskbar(); saveState(STATE);
+    }, 4000);
+  };
+
+  document.getElementById("nextQuestionBtn").onclick = () => {
+    STATE.questionsPool.push(STATE.currentQuestion); prepareMatch();
+  };
+
+  function updateTaskbar() {
+    [1,2,3,4].forEach(r => {
+      const btn = document.getElementById(`nav-r${r}`);
+      btn.disabled = (STATE.round !== r);
+      btn.classList.toggle("active-tab", STATE.round === r);
+    });
+  }
+
+  function parseCSV(file, cb) {
+    const r = new FileReader();
+    r.onload = () => cb(r.result.trim().split("\n").map(l => l.split(",")));
+    r.readAsText(file);
+  }
+});
+</script>
+</body>
+</html>

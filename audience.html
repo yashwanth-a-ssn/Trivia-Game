@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Trivia Night</title>
+  <link rel="stylesheet" href="style-audience.css">
+  <style>
+    .leaderboard-container { 
+      position: relative; 
+      width: 70%; 
+      height: 80vh; 
+      margin: 20px auto; 
+    }
+    
+    /* FIX: Hidden scrollbar for Leaderboard, Sidebar, and Rules */
+    .leaderboard-container, #leaderboard-sidebar, .rules-card {
+      overflow-y: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .leaderboard-container::-webkit-scrollbar, #leaderboard-sidebar::-webkit-scrollbar, .rules-card::-webkit-scrollbar {
+      display: none;
+    }
+
+    .full-tile {
+      position: absolute; width: 100%; height: 60px; background: linear-gradient(90deg, #1e293b, #0f172a);
+      border: 1px solid var(--gold); display: flex; justify-content: space-between; align-items: center;
+      padding: 0 30px; border-radius: 8px; font-size: 1.8rem; transition: all 1s cubic-bezier(0.68, -0.55, 0.265, 1.55); box-sizing: border-box;
+    }
+    .confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; }
+    .big-text { font-size: 5rem; color: var(--gold); text-transform: uppercase; text-shadow: 0 0 20px rgba(245, 197, 66, 0.5); }
+    .winner-announcement { animation: pulse 1s infinite alternate; }
+    @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.1); } }
+
+    .podium-wrapper {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 10px;
+      height: 450px;
+      margin-top: 50px;
+      overflow: hidden;
+    }
+    .podium-step {
+      width: 200px;
+      background: linear-gradient(to top, #1e293b, #334155);
+      border: 3px solid var(--gold);
+      border-bottom: none;
+      border-radius: 15px 15px 0 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 20px;
+      position: relative;
+      transform: translateY(100%);
+      transition: transform 1.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .step-2 { height: 250px; order: 1; transition-delay: 0.5s; }
+    .step-1 { height: 350px; order: 2; background: linear-gradient(to top, #1e293b, #f5c54233); border-width: 5px; transition-delay: 1.5s; }
+    .step-3 { height: 180px; order: 3; transition-delay: 0s; }
+    .podium-step.rise { transform: translateY(0); }
+
+    .podium-rank-label { font-size: 3rem; margin-bottom: 10px; }
+    .podium-name { font-size: 1.5rem; font-weight: bold; text-align: center; }
+    .podium-score { color: var(--gold); font-size: 1.2rem; margin-top: 10px; }
+
+    /* Rules Screen Styling */
+    .rules-card {
+      background: rgba(15, 23, 42, 0.95);
+      border: 2px solid var(--gold);
+      border-radius: 15px;
+      padding: 40px;
+      text-align: left;
+      width: 70%;
+      margin: auto;
+      max-height: 80vh;
+      box-shadow: 0 0 40px rgba(245, 197, 66, 0.3);
+    }
+    .rules-card h1 { color: var(--gold); text-align: center; font-size: 3rem; margin-bottom: 30px; border-bottom: 2px solid var(--gold); padding-bottom: 10px;}
+    .rules-section { margin-bottom: 30px; }
+    .rules-section h2 { color: var(--gold); font-size: 1.8rem; margin-bottom: 15px; }
+    .rules-list { list-style: none; padding: 0; font-size: 1.4rem; line-height: 1.8; }
+    .rules-list li::before { content: "•"; color: var(--gold); font-weight: bold; display: inline-block; width: 1.5em; margin-left: 0.5em; }
+  </style>
+</head>
+<body>
+
+  <canvas id="confetti-canvas" class="confetti"></canvas>
+
+  <div id="leaderboard-sidebar">
+    <div style="position: sticky; top: -20px; background: #0b1026; z-index: 5; padding-top: 20px; margin-top: -20px;">
+      <h3 style="border-bottom: 2px solid var(--gold); padding-bottom: 10px; margin-bottom: 20px;">Live Leaderboard</h3>
+    </div>
+    <div id="sidebar-list" style="position: relative; margin-top: 10px;"></div>
+  </div>
+
+  <div id="main-stage">
+    <div id="screen-welcome" class="screen">
+      <h1 style="font-size: 4rem;">Welcome to Voice Out Presents: Family Feud 🎉</h1>
+    </div>
+
+    <div id="screen-rules" class="screen hidden">
+      <div class="rules-card">
+        <h1>Game Rules</h1>
+        <div class="rules-section">
+          <h2>1. Scoring</h2>
+          <ul class="rules-list">
+            <li><strong>Response Values:</strong> Correct reveals earn 1 to 5 points based on popularity.</li>
+            <li><strong>Point Spread:</strong> The most popular response earns 5 points; the least earns 1 point.</li>
+            <li><strong>Total Score:</strong> All points are cumulative throughout the entire tournament.</li>
+          </ul>
+        </div>
+        <div class="rules-section">
+          <h2>2. Tournament Progression</h2>
+          <ul class="rules-list">
+            <li><strong>Qualifiers:</strong> All the Teams</li>
+            <li><strong>Quarterfinals:</strong> Top 8 Teams</li>
+            <li><strong>Semifinals:</strong> Top 4 Teams</li>
+            <li><strong>Finals:</strong> Top 2 Teams</li>
+          </ul>
+        </div>
+        <div class="rules-section">
+          <h2>3. Tie-Breakers</h2>
+          <ul class="rules-list">
+            <li><strong>Match Ties:</strong> Victory is awarded to the team with the highest-point single answer in that match.</li>
+            <li><strong>Tournament Ties:</strong> Decided by the total count of 5-point answers, then by the highest Qualifier score.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div id="screen-teams" class="screen hidden">
+      <h1 style="font-size: 3rem; color: var(--gold); margin-bottom: 30px;">Today's Contestants</h1>
+      <div id="audience-teams-grid" class="grid-display"></div>
+    </div>
+
+    <div id="screen-round-start" class="screen hidden">
+        <h1 id="start-round-title" class="big-text"></h1>
+        <h2 style="font-size: 3rem;">START!</h2>
+    </div>
+
+    <div id="screen-match" class="screen hidden">
+      <h2 id="round-name"></h2>
+      <h1 id="match-up"></h1>
+      <h3 id="active-q"></h3>
+      <div id="board">
+        <div class="answer-box" id="ans-0"></div>
+        <div class="answer-box" id="ans-1"></div>
+        <div class="answer-box" id="ans-2"></div>
+        <div class="answer-box" id="ans-3"></div>
+        <div class="answer-box" id="ans-4"></div>
+      </div>
+    </div>
+
+    <div id="screen-match-winner" class="screen hidden">
+        <h2 style="font-size: 2rem;">MATCH WINNER</h2>
+        <h1 id="match-winner-name" class="big-text winner-announcement"></h1>
+    </div>
+
+    <div id="screen-leaderboard" class="screen hidden">
+      <h1>Grand Leaderboard</h1>
+      <div id="leaderboard-container" class="leaderboard-container"></div>
+    </div>
+
+    <div id="screen-round-complete" class="screen hidden">
+      <h1 class="big-text">ROUND OVER</h1>
+      <p style="font-size: 2rem;">Finalizing scores for the next round...</p>
+    </div>
+
+    <div id="screen-podium" class="screen hidden">
+      <h1 style="font-size: 3rem;">Champions 🏆</h1>
+      <div id="podium-display" class="podium-wrapper"></div>
+    </div>
+  </div>
+
+  <script src="sync.js"></script>
+  <script>
+    let lastRevealed = 0;
+    const ROUND_NAMES = { 1: "Qualifiers", 2: "Quarterfinals", 3: "Semifinals", 4: "Finals" };
+
+    listen(state => {
+      const sidebar = document.getElementById("leaderboard-sidebar");
+      const hideSidebar = ["welcome", "rules", "teams", "podium", "round-start", "match-winner"].includes(state.displayMode);
+      sidebar.classList.toggle("hidden", hideSidebar || state.displayMode !== "match");
+
+      const sidebarList = document.getElementById("sidebar-list");
+      const sortedTeams = [...state.teams].sort((a,b) => b.score - a.score || a.order - b.order);
+      
+      sidebarList.style.height = (state.teams.length * 60) + "px";
+
+      state.teams.forEach(team => {
+        let el = document.getElementById(`side-tile-${team.order}`);
+        if (!el) {
+          el = document.createElement("div");
+          el.id = `side-tile-${team.order}`;
+          el.className = "team-tile";
+          sidebarList.appendChild(el);
+        }
+        const rank = sortedTeams.findIndex(t => t.order === team.order);
+        el.style.top = `${rank * 60}px`;
+        el.innerHTML = `<span>${team.name}</span><strong>${team.score}</strong>`;
+      });
+
+      document.querySelectorAll(".screen").forEach(s => s.classList.add("hidden"));
+      const activeScreen = document.getElementById(`screen-${state.displayMode}`);
+      if(activeScreen) activeScreen.classList.remove("hidden");
+
+      if (state.displayMode === "teams") {
+        const grid = document.getElementById("audience-teams-grid");
+        grid.innerHTML = state.teams.map(t => `
+          <div class="card-item">
+            <div style="color: var(--gold); font-size: 0.9rem;">TEAM</div>
+            <div style="font-weight: bold;">${t.name}</div>
+          </div>
+        `).join("");
+      }
+
+      if (state.displayMode === "round-start") {
+          document.getElementById("start-round-title").textContent = ROUND_NAMES[state.round];
+      }
+
+      if (state.displayMode === "match-winner") {
+          document.getElementById("match-winner-name").textContent = state.matchWinner || "WELL DONE!";
+          triggerConfetti();
+      }
+
+      if (state.displayMode === "leaderboard") {
+        const container = document.getElementById("leaderboard-container");
+        container.innerHTML = "";
+        
+        const spacer = document.createElement("div");
+        spacer.style.height = (sortedTeams.length * 75) + "px";
+        container.appendChild(spacer);
+
+        sortedTeams.forEach((team, i) => {
+          const tile = document.createElement("div");
+          tile.className = "full-tile";
+          tile.innerHTML = `<span>#${i+1} ${team.name}</span><span>${team.score} PTS</span>`;
+          tile.style.top = "100vh";
+          container.appendChild(tile);
+          setTimeout(() => { tile.style.top = `${i * 75}px`; }, i * 150);
+        });
+        setTimeout(triggerConfetti, sortedTeams.length * 150 + 1000);
+      }
+
+      if (state.displayMode === "match") {
+        document.getElementById("round-name").textContent = ROUND_NAMES[state.round];
+        const pair = state.pairs[state.matchIndex];
+        document.getElementById("match-up").textContent = pair ? `${pair[0].name} vs ${pair[1].name}` : "";
+        document.getElementById("active-q").textContent = state.currentQuestion?.question || "";
+        
+        state.currentQuestion?.answers.forEach((a, i) => {
+          const box = document.getElementById(`ans-${i}`);
+          const revealData = state.revealed.find(r => r.idx === i);
+          if (revealData) {
+            box.innerHTML = `<div>${a.text} (${a.points})</div> <div style="font-size: 1rem; color: var(--gold)">${revealData.winnerName}</div>`;
+            box.classList.add("revealed");
+          } else {
+            box.textContent = "••••••••"; box.classList.remove("revealed");
+          }
+        });
+      }
+
+      if (state.displayMode === "podium") {
+        const sorted = [...state.teams].sort((a,b) => b.score - a.score || a.order - b.order);
+        const podiumDisplay = document.getElementById("podium-display");
+        
+        podiumDisplay.innerHTML = `
+          <div id="step-silver" class="podium-step step-2">
+            <div class="podium-rank-label">🥈</div>
+            <div class="podium-name">${sorted[1]?.name || "-"}</div>
+            <div class="podium-score">${sorted[1]?.score || 0} PTS</div>
+          </div>
+          <div id="step-gold" class="podium-step step-1">
+            <div class="podium-rank-label">🥇</div>
+            <div class="podium-name">${sorted[0]?.name || "-"}</div>
+            <div class="podium-score">${sorted[0]?.score || 0} PTS</div>
+          </div>
+          <div id="step-bronze" class="podium-step step-3">
+            <div class="podium-rank-label">🥉</div>
+            <div class="podium-name">${sorted[2]?.name || "-"}</div>
+            <div class="podium-score">${sorted[2]?.score || 0} PTS</div>
+          </div>
+        `;
+
+        setTimeout(() => {
+          document.getElementById("step-bronze").classList.add("rise");
+          document.getElementById("step-silver").classList.add("rise");
+          document.getElementById("step-gold").classList.add("rise");
+        }, 100);
+
+        triggerConfetti();
+      }
+
+      if (state.revealed.length > lastRevealed) {
+        const stage = document.getElementById("main-stage");
+        stage.style.boxShadow = "inset 0 0 80px rgba(57, 255, 20, 0.6)";
+        setTimeout(() => stage.style.boxShadow = "none", 600);
+      }
+      lastRevealed = state.revealed.length;
+    });
+
+    function triggerConfetti() {
+      const canvas = document.getElementById('confetti-canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      let pieces = [];
+      for (let i = 0; i < 200; i++) {
+        pieces.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height - canvas.height,
+          r: Math.random() * 10 + 5,
+          color: `hsl(${Math.random() * 360}, 100%, 50%)`,
+          v: Math.random() * 5 + 2
+        });
+      }
+      function draw() {
+        ctx.clearRect(0,0,canvas.width, canvas.height);
+        pieces.forEach(p => {
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx.fill();
+          p.y += p.v;
+          if (p.y > canvas.height) p.y = -20;
+        });
+        requestAnimationFrame(draw);
+      }
+      draw();
+      setTimeout(() => { pieces = []; ctx.clearRect(0,0,canvas.width, canvas.height); }, 8000);
+    }
+  </script>
+</body>
+</html>
