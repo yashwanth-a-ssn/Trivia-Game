@@ -10,7 +10,6 @@ A high-performance, real-time trivia tournament system built for professional li
 * **Automated Background Logging**: A specialized engine silently records every score, answer, and winner into a human-readable `.txt` file using the File System Access API.
 * **Rank-Based Tournament Logic**: Automatic progression management through **Qualifiers** (Full Field), **Quarterfinals** (Top 8), **Semifinals** (Top 4), and **Finals** (Top 2).
 * **Intelligent Pairing**: In advanced rounds, the system automatically pairs contestants by their current rank (Rank 1 vs. Rank 2, Rank 3 vs. Rank 4, etc.) to ensure high-stakes competition.
-* **The "Suspense" Engine**: Features a programmable 1.5-second delay after the final answer reveal before the match winner is announced to the audience.
 * **Premium Visuals**: Includes automated confetti celebrations, a 3D-style rising podium for champions, and dedicated interactive screens for rules and team introductions.
 
 ---
