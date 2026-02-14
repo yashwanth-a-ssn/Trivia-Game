@@ -6,53 +6,31 @@
   <link rel="stylesheet" href="style-admin.css">
   <style>
     #admin-leaderboard-list {
-      text-align: left;
-      max-height: 300px;
-      overflow-y: auto;
-      background: rgba(0,0,0,0.2);
-      padding: 15px;
-      border-radius: 8px;
-      margin-bottom: 15px;
+      text-align: left; max-height: 300px; overflow-y: auto;
+      background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; margin-bottom: 15px;
     }
     .admin-lb-item {
-      display: flex;
-      justify-content: space-between;
-      padding: 8px 0;
+      display: flex; justify-content: space-between; padding: 8px 0;
       border-bottom: 1px solid rgba(245, 197, 66, 0.2);
     }
     #admin-podium-preview {
-      display: flex;
-      justify-content: center;
-      align-items: flex-end;
-      gap: 15px;
-      margin-bottom: 20px;
-      padding: 20px;
-      background: rgba(255,255,255,0.05);
-      border-radius: 10px;
+      display: flex; justify-content: center; align-items: flex-end; gap: 15px;
+      margin-bottom: 20px; padding: 20px; background: rgba(255,255,255,0.05); border-radius: 10px;
     }
     .admin-podium-slot {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 10px;
-      border: 1px solid var(--gold);
-      border-radius: 8px;
-      width: 120px;
+      display: flex; flex-direction: column; align-items: center; padding: 10px;
+      border: 1px solid var(--gold); border-radius: 8px; width: 120px;
     }
     .nav-btn.active-tab {
-      background: var(--gold);
-      color: black;
-      font-weight: bold;
+      background: var(--gold); color: black; font-weight: bold;
     }
-    /* Hidden Scrollbar for Rules */
-    .rules-scroll {
-      overflow-y: auto;
-      scrollbar-width: none;
-      -ms-overflow-style: none;
+    .game-name-input {
+      padding: 10px; font-size: 1rem; border-radius: 5px; border: 1px solid var(--gold);
+      background: #000; color: #fff; margin-bottom: 10px; width: 250px;
     }
-    .rules-scroll::-webkit-scrollbar {
-      display: none;
-    }
+    /* Hidden Scrollbar logic preserved */
+    .rules-scroll { overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; }
+    .rules-scroll::-webkit-scrollbar { display: none; }
   </style>
 </head>
 <body>
@@ -74,6 +52,7 @@
 <h1>Trivia Admin Control</h1>
 
 <div id="view-home" class="card">
+  <input type="text" id="gameNameInput" placeholder="Enter Game Name..." class="game-name-input"><br>
   <button id="newGameBtn" style="font-size: 1.5rem; padding: 20px;">New Game</button>
 </div>
 
@@ -88,10 +67,10 @@
     </ul>
     <h3>2. Tournament Progression</h3>
     <ul>
-      <li><strong>Qualifiers:</strong> All the Teams</li>
-      <li><strong>Quarterfinals:</strong> Top 8 Teams</li>
-      <li><strong>Semifinals:</strong> Top 4 Teams</li>
-      <li><strong>Finals:</strong> Top 2 Teams</li>
+      <li>Qualifiers: All the Teams</li>
+      <li>Quarterfinals: Top 8 Teams</li>
+      <li>Semifinals: Top 4 Teams</li>
+      <li>Finals: Top 2 Teams</li>
     </ul>
     <h3>3. Tie-Breakers</h3>
     <ul>
@@ -151,34 +130,41 @@
 <script src="storage.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
+  let logHandle = null; 
   let STATE = loadState() || {
-    displayMode: "welcome", 
-    round: 1, teams: [], pairs: [], matchIndex: 0,
+    displayMode: "welcome", round: 1, teams: [], pairs: [], matchIndex: 0,
     questionsPool: [], currentQuestion: null, revealed: [], 
     isMatchLive: false, matchWinner: null, matchScores: [0, 0],
-    matchHighPointAnswerIdx: [null, null]
+    matchHighPointAnswerIdx: [null, null], gameName: ""
   };
 
   const ROUND_NAMES = { 1: "Qualifiers", 2: "Quarterfinals", 3: "Semifinals", 4: "Finals" };
   const ADVANCEMENT = { 1: 8, 2: 4, 3: 2, 4: 1 };
 
+  /* LOGGING ENGINE */
+  async function writeLog(text) {
+    if (!logHandle) return;
+    try {
+      const writable = await logHandle.createWritable({ keepExistingData: true });
+      const file = await logHandle.getFile();
+      await writable.write({ type: 'write', position: file.size, data: text + "\n" });
+      await writable.close();
+    } catch (e) { console.error("Logging failed", e); }
+  }
+
   function resetStatusUI() {
     const status = document.getElementById("admin-status");
-    if(status) {
-      status.textContent = "ADMIN PREVIEW - NOT ON AUDIENCE";
-      status.style.background = "#f5c542";
-    }
+    if(status) { status.textContent = "ADMIN PREVIEW - NOT ON AUDIENCE"; status.style.background = "#f5c542"; }
     STATE.isMatchLive = false;
   }
 
   const showView = (id, tabName) => {
     document.querySelectorAll('.card').forEach(c => c.classList.add("hidden"));
-    document.getElementById(id).classList.remove("hidden");
+    const target = document.getElementById(id);
+    if(target) target.classList.remove("hidden");
     document.getElementById("current-tab-indicator").textContent = tabName;
-    
     if(id === "view-leaderboard") updateAdminLeaderboard();
     if(id === "view-podium") updateAdminPodium(); 
-
     document.querySelectorAll('.nav-btn').forEach(btn => {
         btn.classList.toggle('active-tab', btn.textContent === tabName || btn.id.includes(id.split('-')[1]));
     });
@@ -187,30 +173,16 @@ document.addEventListener("DOMContentLoaded", () => {
   function updateAdminLeaderboard() {
     const list = document.getElementById("admin-leaderboard-list");
     const sorted = [...STATE.teams].sort((a,b) => b.score - a.score || a.order - b.order);
-    list.innerHTML = sorted.map((t, i) => `
-      <div class="admin-lb-item"><span>#${i+1} ${t.name}</span><strong>${t.score} PTS</strong></div>
-    `).join("");
+    list.innerHTML = sorted.map((t, i) => `<div class="admin-lb-item"><span>#${i+1} ${t.name}</span><strong>${t.score} PTS</strong></div>`).join("");
   }
 
   function updateAdminPodium() {
     const preview = document.getElementById("admin-podium-preview");
     const sorted = [...STATE.teams].sort((a,b) => b.score - a.score || a.order - b.order);
     preview.innerHTML = `
-      <div class="admin-podium-slot" style="height: 100px;">
-        <div style="font-size: 1.5rem;">🥈</div>
-        <div style="font-weight: bold;">${sorted[1]?.name || "-"}</div>
-        <div style="font-size: 0.8rem;">${sorted[1]?.score || 0} PTS</div>
-      </div>
-      <div class="admin-podium-slot" style="height: 140px; border-width: 3px;">
-        <div style="font-size: 2rem;">🥇</div>
-        <div style="font-weight: bold;">${sorted[0]?.name || "-"}</div>
-        <div style="font-size: 0.9rem;">${sorted[0]?.score || 0} PTS</div>
-      </div>
-      <div class="admin-podium-slot" style="height: 80px;">
-        <div style="font-size: 1.2rem;">🥉</div>
-        <div style="font-weight: bold;">${sorted[2]?.name || "-"}</div>
-        <div style="font-size: 0.8rem;">${sorted[2]?.score || 0} PTS</div>
-      </div>
+      <div class="admin-podium-slot" style="height: 100px;">🥈 ${sorted[1]?.name || "-"}</div>
+      <div class="admin-podium-slot" style="height: 140px; font-weight: bold;">🥇 ${sorted[0]?.name || "-"}</div>
+      <div class="admin-podium-slot" style="height: 80px;">🥉 ${sorted[2]?.name || "-"}</div>
     `;
   }
 
@@ -241,37 +213,47 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("btnDisplayLeaderboard").onclick = () => { STATE.displayMode = "leaderboard"; broadcast(STATE); saveState(STATE); };
   document.getElementById("btnDisplayPodium").onclick = () => { STATE.displayMode = "podium"; broadcast(STATE); saveState(STATE); };
 
-  document.getElementById("newGameBtn").onclick = () => {
-    clearState();
-    STATE = {
-      displayMode: "welcome", round: 1, teams: [], pairs: [], matchIndex: 0,
-      questionsPool: [], currentQuestion: null, revealed: [], 
-      isMatchLive: false, matchWinner: null, matchScores: [0, 0],
-      matchHighPointAnswerIdx: [null, null]
-    };
-    window.open("audience.html", "_blank");
-    showView("view-teams", "Teams");
-    document.getElementById("taskbar").classList.remove("hidden");
-    document.getElementById("teams-list-admin").innerHTML = "";
-    document.getElementById("start-section").classList.add("hidden");
-    document.getElementById("upload-section").classList.remove("hidden");
-    updateTaskbar();
-    broadcast(STATE);
-    saveState(STATE);
+  /* FIXED: NEW GAME TRANSITION & LOG HANDLE */
+  document.getElementById("newGameBtn").onclick = async () => {
+    const name = document.getElementById("gameNameInput").value.trim();
+    if(!name) return alert("Please enter a Game Name first.");
+    if(!confirm("Start a new game? Existing scores will be lost.")) return;
+    
+    try {
+      logHandle = await window.showSaveFilePicker({
+        suggestedName: `${name.replace(/\s+/g, '_')}.txt`,
+        types: [{ description: 'Text File', accept: { 'text/plain': ['.txt'] } }]
+      });
+      
+      clearState();
+      Object.assign(STATE, {
+        displayMode: "teams", round: 1, teams: [], pairs: [], matchIndex: 0,
+        questionsPool: [], currentQuestion: null, revealed: [], 
+        isMatchLive: false, matchWinner: null, matchScores: [0, 0],
+        matchHighPointAnswerIdx: [null, null], gameName: name
+      });
+      
+      // Force UI transition IMMEDIATELY
+      document.getElementById("taskbar").classList.remove("hidden");
+      updateTaskbar();
+      showView("view-teams", "Teams");
+      
+      await writeLog(`Game: ${STATE.gameName}\n`);
+      window.open("audience.html", "_blank");
+      broadcast(STATE);
+      saveState(STATE);
+    } catch (e) { console.error("Process aborted", e); }
   };
 
   document.getElementById("teamsFile").onchange = e => {
-    parseCSV(e.target.files[0], rows => {
-      if (!rows[0] || rows[0][0].trim() !== "Teams") {
-        alert("CRITICAL ERROR: Invalid file. The first row must be 'Teams'. Upload canceled.");
-        e.target.value = ""; return;
-      }
+    const fileName = e.target.files[0].name;
+    parseCSV(e.target.files[0], async rows => {
+      if (!rows[0] || rows[0][0].trim() !== "Teams") return alert("Header must be 'Teams'");
       const teamData = rows.slice(1).filter(r => r[0] && r[0].trim() !== "");
-      if (teamData.length % 2 !== 0) {
-        alert("Error: Team list must have an EVEN number of teams.");
-        e.target.value = ""; return;
-      }
       STATE.teams = teamData.map((r, i) => ({ name: r[0].trim(), score: 0, order: i, qualified: true }));
+      let log = `\nTeams:\nTeam List: ${fileName}\n`;
+      STATE.teams.forEach(t => log += `${t.name}\n`);
+      await writeLog(log);
       document.getElementById("teams-list-admin").innerHTML = STATE.teams.map(t => `<div>• ${t.name}</div>`).join("");
       document.getElementById("taskbar").classList.remove("hidden");
       updateTaskbar();
@@ -280,20 +262,22 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   document.getElementById("questionsFile").onchange = e => {
-    parseCSV(e.target.files[0], rows => {
-      const header = rows[0].map(h => h.trim()).join(",");
-      if (header !== "Question,Answer,Points") {
-        alert("CRITICAL ERROR: Invalid Question file.\nHeader must be: Question,Answer,Points\nUpload canceled.");
-        e.target.value = ""; return;
-      }
+    const fileName = e.target.files[0].name;
+    parseCSV(e.target.files[0], async rows => {
+      if (!rows[0] || rows[0].map(c => c.trim()).join(",") !== "Question,Answer,Points") return alert("Invalid Question Header");
       const grouped = {};
       rows.slice(1).forEach(r => {
-        if (r[0] && r[0].trim() !== "") {
-          if (!grouped[r[0]]) grouped[r[0]] = [];
-          grouped[r[0]].push({ text: r[1].trim(), points: parseInt(r[2]) || 0 });
+        const qText = (r[0] || "").trim();
+        if (qText !== "") {
+          if (!grouped[qText]) grouped[qText] = [];
+          /* FIXED: SAFETY VALIDATION FOR UNDEFINED/NAN */
+          const ansText = (r[1] || "???").trim();
+          const ansPts = parseInt(r[2]) || 0;
+          grouped[qText].push({ text: ansText, points: isNaN(ansPts) ? 0 : ansPts });
         }
       });
       STATE.questionsPool = Object.entries(grouped).map(([q, a]) => ({ question: q, answers: a }));
+      await writeLog(`\nRound: ${ROUND_NAMES[STATE.round]}\nQuestion List: ${fileName}\n`);
       document.getElementById("upload-section").classList.add("hidden");
       document.getElementById("start-section").classList.remove("hidden");
       saveState(STATE);
@@ -304,9 +288,7 @@ document.addEventListener("DOMContentLoaded", () => {
     STATE.matchIndex = 0;
     const activeTeams = STATE.teams.filter(t => t.qualified);
     STATE.pairs = [];
-    for(let i=0; i < activeTeams.length; i+=2) {
-      if(activeTeams[i+1]) STATE.pairs.push([activeTeams[i], activeTeams[i+1]]);
-    }
+    for(let i=0; i < activeTeams.length; i+=2) { if(activeTeams[i+1]) STATE.pairs.push([activeTeams[i], activeTeams[i+1]]); }
     STATE.displayMode = "round-start";
     broadcast(STATE);
     prepareMatch();
@@ -316,13 +298,22 @@ document.addEventListener("DOMContentLoaded", () => {
     resetStatusUI(); 
     STATE.matchWinner = null; STATE.matchScores = [0, 0];
     STATE.matchHighPointAnswerIdx = [null, null];
-    if (STATE.questionsPool.length === 0) return alert("No questions left in pool!");
+    if (STATE.questionsPool.length === 0) return alert("No questions left!");
     STATE.currentQuestion = STATE.questionsPool.splice(Math.floor(Math.random() * STATE.questionsPool.length), 1)[0];
     STATE.revealed = [];
     renderMatch();
     showView("view-match", ROUND_NAMES[STATE.round]);
     saveState(STATE);
   }
+
+  document.getElementById("btnDisplayMatch").onclick = async () => { 
+    STATE.displayMode = "match"; STATE.isMatchLive = true; 
+    document.getElementById("admin-status").textContent = "LIVE ON AUDIENCE";
+    document.getElementById("admin-status").style.background = "#22c55e";
+    const pair = STATE.pairs[STATE.matchIndex];
+    await writeLog(`\nMatch: ${pair[0].name} Vs ${pair[1].name}\nQuestion: ${STATE.currentQuestion.question}\n`);
+    broadcast(STATE); saveState(STATE);
+  };
 
   function renderMatch() {
     const pair = STATE.pairs[STATE.matchIndex];
@@ -340,83 +331,60 @@ document.addEventListener("DOMContentLoaded", () => {
     `).join("");
   }
 
-  window.award = (ansIdx, teamIdxInPair) => {
+  window.award = async (ansIdx, teamIdxInPair) => {
     if (!STATE.isMatchLive) return alert("Click 'Display Match to Audience' first!");
     if (STATE.revealed.find(r => r.idx === ansIdx)) return;
-    const points = STATE.currentQuestion.answers[ansIdx].points;
+    const ans = STATE.currentQuestion.answers[ansIdx];
     const pair = STATE.pairs[STATE.matchIndex];
-    let winnerName = (teamIdxInPair !== null) ? pair[teamIdxInPair].name : "Revealed";
+    let winnerName = "Empty Reveal"; let awardedPts = 0;
     if (teamIdxInPair !== null) {
-      STATE.teams.find(t => t.name === winnerName).score += points;
-      STATE.matchScores[teamIdxInPair] += points;
+      winnerName = pair[teamIdxInPair].name; awardedPts = ans.points;
+      STATE.teams.find(t => t.name === winnerName).score += ans.points;
+      STATE.matchScores[teamIdxInPair] += ans.points;
       const curMax = STATE.matchHighPointAnswerIdx[0] !== null ? STATE.currentQuestion.answers[STATE.matchHighPointAnswerIdx[0]].points : -1;
-      if (points > curMax) STATE.matchHighPointAnswerIdx = [ansIdx, teamIdxInPair];
+      if (ans.points > curMax) STATE.matchHighPointAnswerIdx = [ansIdx, teamIdxInPair];
     }
+    await writeLog(`${ans.text} : ${winnerName} -> ${awardedPts}`);
     STATE.revealed.push({ idx: ansIdx, winnerName: winnerName });
     broadcast(STATE); saveState(STATE);
-
     if (STATE.revealed.length === STATE.currentQuestion.answers.length) {
       if (STATE.matchScores[0] > STATE.matchScores[1]) STATE.matchWinner = pair[0].name;
       else if (STATE.matchScores[1] > STATE.matchScores[0]) STATE.matchWinner = pair[1].name;
       else STATE.matchWinner = (STATE.matchHighPointAnswerIdx[1] !== null) ? pair[STATE.matchHighPointAnswerIdx[1]].name : "DRAW!";
       STATE.displayMode = "match-winner";
+      const winTeam = STATE.teams.find(t => t.name === STATE.matchWinner);
+      await writeLog(`\n${pair[0].name} ${STATE.matchScores[0]}\n${pair[1].name} ${STATE.matchScores[1]}\nWinner: ${STATE.matchWinner} => ${winTeam ? winTeam.score : 0}`);
       broadcast(STATE); saveState(STATE);
       setTimeout(() => {
-        if (STATE.matchIndex < STATE.pairs.length - 1) { 
-          STATE.matchIndex++; STATE.displayMode = "leaderboard";
-          broadcast(STATE); prepareMatch(); 
-        } else { 
-          resetStatusUI();
-          alert("Round matches finished! Proceed to the Leaderboard."); 
-        }
+        if (STATE.matchIndex < STATE.pairs.length - 1) { STATE.matchIndex++; STATE.displayMode = "leaderboard"; broadcast(STATE); prepareMatch(); }
+        else { resetStatusUI(); alert("Round matches finished!"); }
       }, 5000);
     }
   };
 
-  document.getElementById("btnDisplayMatch").onclick = () => { 
-    STATE.displayMode = "match"; STATE.isMatchLive = true; 
-    document.getElementById("admin-status").textContent = "LIVE ON AUDIENCE";
-    document.getElementById("admin-status").style.background = "#22c55e";
-    broadcast(STATE); saveState(STATE);
-  };
-
-  document.getElementById("endRoundBtn").onclick = () => {
+  document.getElementById("endRoundBtn").onclick = async () => {
+    const roundName = ROUND_NAMES[STATE.round];
     resetStatusUI();
     const limit = ADVANCEMENT[STATE.round];
     const sorted = [...STATE.teams].sort((a,b) => b.score - a.score || a.order - b.order);
     STATE.teams.forEach(t => t.qualified = false);
     sorted.slice(0, limit).forEach(t => STATE.teams.find(orig => orig.name === t.name).qualified = true);
+    let log = `\n${roundName} Over\n\nLeaderBoard:\n`;
+    sorted.forEach((t, i) => log += `${i+1}) ${t.name} : ${t.score} => (${i < limit ? "Selected" : "Eliminated"})\n`);
+    if (STATE.round === 4) log += `\nGame Winners\nFirst: ${sorted[0].name} : ${sorted[0].score}\nSecond: ${sorted[1].name} : ${sorted[1].score}\nThird: ${sorted[2].name} : ${sorted[2].score}\n`;
+    await writeLog(log);
     STATE.displayMode = "round-complete";
     broadcast(STATE); saveState(STATE);
     setTimeout(() => {
-        if (STATE.round < 4) {
-          STATE.round++; STATE.currentQuestion = null; STATE.questionsPool = [];
-          document.getElementById("upload-section").classList.remove("hidden");
-          document.getElementById("start-section").classList.add("hidden");
-          document.getElementById("questionsFile").value = ""; 
-          showView("view-leaderboard", "Leaderboard");
-        } else showView("view-podium", "Podium");
+        if (STATE.round < 4) { STATE.round++; STATE.currentQuestion = null; STATE.questionsPool = []; document.getElementById("upload-section").classList.remove("hidden"); document.getElementById("start-section").classList.add("hidden"); document.getElementById("questionsFile").value = ""; showView("view-leaderboard", "Leaderboard"); }
+        else showView("view-podium", "Podium");
         updateTaskbar(); saveState(STATE);
     }, 4000);
   };
 
-  document.getElementById("nextQuestionBtn").onclick = () => {
-    STATE.questionsPool.push(STATE.currentQuestion); prepareMatch();
-  };
-
-  function updateTaskbar() {
-    [1,2,3,4].forEach(r => {
-      const btn = document.getElementById(`nav-r${r}`);
-      btn.disabled = (STATE.round !== r);
-      btn.classList.toggle("active-tab", STATE.round === r);
-    });
-  }
-
-  function parseCSV(file, cb) {
-    const r = new FileReader();
-    r.onload = () => cb(r.result.trim().split("\n").map(l => l.split(",")));
-    r.readAsText(file);
-  }
+  document.getElementById("nextQuestionBtn").onclick = () => { STATE.questionsPool.push(STATE.currentQuestion); prepareMatch(); };
+  function updateTaskbar() { [1,2,3,4].forEach(r => { const btn = document.getElementById(`nav-r${r}`); btn.disabled = (STATE.round !== r); btn.classList.toggle("active-tab", STATE.round === r); }); }
+  function parseCSV(file, cb) { const r = new FileReader(); r.onload = () => cb(r.result.trim().split("\n").map(l => l.split(","))); r.readAsText(file); }
 });
 </script>
 </body>
