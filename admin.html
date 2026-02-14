@@ -164,6 +164,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const ROUND_NAMES = { 1: "Qualifiers", 2: "Quarterfinals", 3: "Semifinals", 4: "Finals" };
   const ADVANCEMENT = { 1: 8, 2: 4, 3: 2, 4: 1 };
+  const HR = "--------------------------------------------------------------------------------------------------------------\n";
 
   // --- LOGGING ENGINE ---
   let fileHandle = null;
@@ -195,6 +196,13 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById(id).classList.remove("hidden");
     document.getElementById("current-tab-indicator").textContent = tabName;
     
+    // Fix: Ensure Start Section is visible if return to Setup mid-round
+    if (id === "view-setup") {
+        const hasData = STATE.questionsPool && STATE.questionsPool.length > 0;
+        document.getElementById("upload-section").classList.toggle("hidden", hasData);
+        document.getElementById("start-section").classList.toggle("hidden", !hasData);
+    }
+
     if(id === "view-leaderboard") updateAdminLeaderboard();
     if(id === "view-podium") updateAdminPodium(); 
 
@@ -255,13 +263,26 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   });
 
-  document.getElementById("btnDisplayRules").onclick = () => { STATE.displayMode = "rules"; broadcast(STATE); saveState(STATE); };
-  document.getElementById("btnDisplayTeams").onclick = () => { STATE.displayMode = "teams"; broadcast(STATE); saveState(STATE); };
+  // FLOW: Display Rules -> Go to Teams
+  document.getElementById("btnDisplayRules").onclick = () => { 
+    STATE.displayMode = "rules"; 
+    broadcast(STATE); 
+    saveState(STATE); 
+    showView("view-teams", "Teams");
+  };
+
+  // FLOW: Display Teams -> Go to Setup
+  document.getElementById("btnDisplayTeams").onclick = () => { 
+    STATE.displayMode = "teams"; 
+    broadcast(STATE); 
+    saveState(STATE); 
+    showView("view-setup", `${ROUND_NAMES[STATE.round]} Setup`);
+  };
+
   document.getElementById("btnDisplayLeaderboard").onclick = () => { STATE.displayMode = "leaderboard"; broadcast(STATE); saveState(STATE); };
   document.getElementById("btnDisplayPodium").onclick = () => { STATE.displayMode = "podium"; broadcast(STATE); saveState(STATE); };
 
   document.getElementById("newGameBtn").onclick = async () => {
-    // Check for API support first
     if (!window.showSaveFilePicker) {
       alert("Error: Your browser does not support the File System API. Please use Chrome or Edge.");
       return;
@@ -271,16 +292,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const gameName = gInput && gInput.value.trim() !== "" ? gInput.value.trim() : "Untitled Game";
 
     try {
-      // 1. Prompt for File Save
       fileHandle = await window.showSaveFilePicker({
         suggestedName: `${gameName.replace(/\s+/g, '_')}_Log.txt`,
         types: [{ description: 'Text File', accept: {'text/plain': ['.txt']} }]
       });
 
-      // 2. Immediate Logic Transition
       window.open("audience.html", "_blank");
       
-      // Clear and Initialize State
       clearState();
       STATE = {
         displayMode: "welcome", round: 1, teams: [], pairs: [], matchIndex: 0,
@@ -289,8 +307,7 @@ document.addEventListener("DOMContentLoaded", () => {
         matchHighPointAnswerIdx: [null, null]
       };
 
-      // UI Transition: Show Teams & Taskbar
-      showView("view-teams", "Teams");
+      showView("view-rules", "Rules");
       document.getElementById("taskbar").classList.remove("hidden");
       document.getElementById("teams-list-admin").innerHTML = "";
       document.getElementById("start-section").classList.add("hidden");
@@ -300,8 +317,7 @@ document.addEventListener("DOMContentLoaded", () => {
       broadcast(STATE);
       saveState(STATE);
 
-      // 3. Log Game Name Background
-      appendToLog(`Game: ${gameName}\n\n`);
+      await appendToLog(`Game: ${gameName}\n\n${HR}\n`);
 
     } catch (err) {
       console.error(err);
@@ -325,8 +341,7 @@ document.addEventListener("DOMContentLoaded", () => {
       STATE.teams = teamData.map((r, i) => ({ name: r[0].trim(), score: 0, order: i, qualified: true }));
       document.getElementById("teams-list-admin").innerHTML = STATE.teams.map(t => `<div>• ${t.name}</div>`).join("");
       
-      // Log Trigger: Teams
-      let teamLog = `Teams:\nTeam List: ${file.name}\n` + STATE.teams.map(t => t.name).join("\n") + "\n\n";
+      let teamLog = `Teams:\nTeam List: ${file.name}\n\n` + STATE.teams.map(t => t.name).join("\n") + `\n\n${HR}\n`;
       appendToLog(teamLog);
 
       updateTaskbar();
@@ -351,22 +366,29 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       });
       STATE.questionsPool = Object.entries(grouped).map(([q, a]) => ({ question: q, answers: a }));
+      
       document.getElementById("upload-section").classList.add("hidden");
       document.getElementById("start-section").classList.remove("hidden");
       
-      // Log Trigger: Round Setup
-      appendToLog(`Round: ${ROUND_NAMES[STATE.round]}\nQuestion List: ${file.name}\n\n`);
+      appendToLog(`Round: ${ROUND_NAMES[STATE.round]}\n\n\nQuestion List: ${file.name}\n\n`);
       saveState(STATE);
     });
   };
 
   document.getElementById("startRoundBtn").onclick = () => {
     STATE.matchIndex = 0;
-    const activeTeams = STATE.teams.filter(t => t.qualified);
+    
+    // LOGIC FIX: Sort qualified teams by current Rank (Score) before pairing
+    // This ensures Rank 1 competes with Rank 2, Rank 3 with Rank 4, etc.
+    const activeTeams = STATE.teams
+        .filter(t => t.qualified)
+        .sort((a,b) => b.score - a.score || a.order - b.order);
+
     STATE.pairs = [];
     for(let i=0; i < activeTeams.length; i+=2) {
       if(activeTeams[i+1]) STATE.pairs.push([activeTeams[i], activeTeams[i+1]]);
     }
+    
     STATE.displayMode = "round-start";
     broadcast(STATE);
     prepareMatch();
@@ -416,28 +438,34 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     STATE.revealed.push({ idx: ansIdx, winnerName: winnerName });
     
-    // Log Trigger: Answer
-    appendToLog(`${ans.text} : ${winnerName} -> ${ans.points}\n`);
+    appendToLog(`${STATE.revealed.length}) ${ans.text} : ${winnerName} -> ${ans.points}\n`);
 
     broadcast(STATE); saveState(STATE);
 
     if (STATE.revealed.length === STATE.currentQuestion.answers.length) {
-      if (STATE.matchScores[0] > STATE.matchScores[1]) STATE.matchWinner = pair[0].name;
-      else if (STATE.matchScores[1] > STATE.matchScores[0]) STATE.matchWinner = pair[1].name;
-      else STATE.matchWinner = (STATE.matchHighPointAnswerIdx[1] !== null) ? pair[STATE.matchHighPointAnswerIdx[1]].name : "DRAW!";
-      
-      // Log Trigger: Match Result
-      let winnerTotal = STATE.teams.find(t => t.name === STATE.matchWinner)?.score || 0;
-      appendToLog(`\n${pair[0].name} ${STATE.matchScores[0]}\n${pair[1].name} ${STATE.matchScores[1]}\nWinner: ${STATE.matchWinner} => ${winnerTotal}\n\n`);
+        setTimeout(async () => {
+            if (STATE.matchScores[0] > STATE.matchScores[1]) STATE.matchWinner = pair[0].name;
+            else if (STATE.matchScores[1] > STATE.matchScores[0]) STATE.matchWinner = pair[1].name;
+            else STATE.matchWinner = (STATE.matchHighPointAnswerIdx[1] !== null) ? pair[STATE.matchHighPointAnswerIdx[1]].name : "DRAW!";
+            
+            let winnerTotal = STATE.teams.find(t => t.name === STATE.matchWinner)?.score || 0;
+            let resultLog = `\n${pair[0].name} => ${STATE.matchScores[0]} Points\n` + 
+                            `${pair[1].name} => ${STATE.matchScores[1]} Points\n` + 
+                            `Winner: ${STATE.matchWinner} => ${winnerTotal} Points\n\n${HR}\n`;
+            await appendToLog(resultLog);
 
-      STATE.displayMode = "match-winner";
-      broadcast(STATE); saveState(STATE);
-      setTimeout(() => {
-        if (STATE.matchIndex < STATE.pairs.length - 1) { 
-          STATE.matchIndex++; STATE.displayMode = "leaderboard";
-          broadcast(STATE); prepareMatch(); 
-        } else alert("Round matches finished!");
-      }, 5000);
+            STATE.displayMode = "match-winner";
+            broadcast(STATE); saveState(STATE);
+            
+            setTimeout(() => {
+                if (STATE.matchIndex < STATE.pairs.length - 1) { 
+                  STATE.matchIndex++; 
+                  STATE.displayMode = "leaderboard";
+                  broadcast(STATE); 
+                  prepareMatch(); 
+                } else alert("Round matches finished!");
+            }, 5000);
+        }, 1000);
     }
   };
 
@@ -446,7 +474,6 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("admin-status").textContent = "LIVE ON AUDIENCE";
     document.getElementById("admin-status").style.background = "#22c55e";
     
-    // Log Trigger: Match Start
     const pair = STATE.pairs[STATE.matchIndex];
     appendToLog(`Match: ${pair[0].name} Vs ${pair[1].name}\nQuestion: ${STATE.currentQuestion.question}\n\n`);
 
@@ -457,26 +484,35 @@ document.addEventListener("DOMContentLoaded", () => {
     resetStatusUI();
     const limit = ADVANCEMENT[STATE.round];
     const sorted = [...STATE.teams].sort((a,b) => b.score - a.score || a.order - b.order);
-    STATE.teams.forEach(t => t.qualified = false);
-    sorted.slice(0, limit).forEach(t => STATE.teams.find(orig => orig.name === t.name).qualified = true);
     
-    // Log Trigger: Leaderboard
-    let lbLog = `${ROUND_NAMES[STATE.round]} Over\n\nLeaderBoard:\n`;
+    // LOGIC FIX: Strictly Advance only the top X teams based on the round limit
+    STATE.teams.forEach(t => t.qualified = false);
+    sorted.slice(0, limit).forEach(t => {
+        const team = STATE.teams.find(orig => orig.name === t.name);
+        if (team) team.qualified = true;
+    });
+    
+    let lbLog = `${ROUND_NAMES[STATE.round]} Over\n\n${HR}\nLeaderBoard:\n`;
     sorted.forEach((t, i) => lbLog += `${i+1}) ${t.name} : ${t.score} => (${t.qualified ? 'Selected' : 'Eliminated'})\n`);
-    appendToLog(lbLog + "\n");
+    appendToLog(lbLog + `\n${HR}\n`);
 
     STATE.displayMode = "round-complete";
     broadcast(STATE); saveState(STATE);
+
+    // Reset setup UI for next round
+    document.getElementById("upload-section").classList.remove("hidden");
+    document.getElementById("start-section").classList.add("hidden");
+    document.getElementById("questionsFile").value = ""; 
+
     setTimeout(() => {
         if (STATE.round < 4) {
-          STATE.round++; STATE.currentQuestion = null; STATE.questionsPool = [];
-          document.getElementById("upload-section").classList.remove("hidden");
-          document.getElementById("start-section").classList.add("hidden");
+          STATE.round++; 
+          STATE.currentQuestion = null; 
+          STATE.questionsPool = [];
           showView("view-leaderboard", "Leaderboard");
         } else {
           showView("view-podium", "Podium");
-          // Log Trigger: Final Podium
-          let pod = `Game Winners\nFirst: ${sorted[0].name} : ${sorted[0].score}\nSecond: ${sorted[1].name} : ${sorted[1].score}\nThird: ${sorted[2].name} : ${sorted[2].score}\n`;
+          let pod = `Game Winners\nFirst: ${sorted[0].name} : ${sorted[0].score} Points\nSecond: ${sorted[1].name} : ${sorted[1].score} Points\nThird: ${sorted[2].name} : ${sorted[2].score} Points\n\n${HR}\n`;
           appendToLog(pod);
         }
         updateTaskbar(); saveState(STATE);
