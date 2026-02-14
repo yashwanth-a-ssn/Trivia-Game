@@ -5,10 +5,21 @@
   <title>Trivia Admin - Control Panel</title>
   <link rel="stylesheet" href="style-admin.css">
   <style>
+    /* Required for scannability and requested hidden scrollbars */
+    #admin-leaderboard-list, #teams-list-admin, .rules-scroll {
+      overflow-y: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    #admin-leaderboard-list::-webkit-scrollbar, 
+    #teams-list-admin::-webkit-scrollbar, 
+    .rules-scroll::-webkit-scrollbar {
+      display: none;
+    }
+
     #admin-leaderboard-list {
       text-align: left;
       max-height: 300px;
-      overflow-y: auto;
       background: rgba(0,0,0,0.2);
       padding: 15px;
       border-radius: 8px;
@@ -44,25 +55,6 @@
       color: black;
       font-weight: bold;
     }
-    /* Hidden Scrollbar for Rules */
-    .rules-scroll {
-      overflow-y: auto;
-      scrollbar-width: none;
-      -ms-overflow-style: none;
-    }
-    .rules-scroll::-webkit-scrollbar {
-      display: none;
-    }
-    .game-name-input {
-      padding: 10px;
-      font-size: 1rem;
-      border-radius: 5px;
-      border: 1px solid var(--gold);
-      background: #000;
-      color: #fff;
-      margin-bottom: 10px;
-      width: 250px;
-    }
   </style>
 </head>
 <body>
@@ -84,7 +76,7 @@
 <h1>Trivia Admin Control</h1>
 
 <div id="view-home" class="card">
-  <input type="text" id="gameNameInput" placeholder="Enter Game Name..." class="game-name-input"><br>
+  <input type="text" id="gameNameInput" placeholder="Enter Game Name" style="font-size: 1.2rem; padding: 10px; margin-bottom: 20px; width: 80%; max-width: 400px; display: block; margin-left: auto; margin-right: auto; text-align: center; border-radius: 5px; border: 1px solid #ccc;">
   <button id="newGameBtn" style="font-size: 1.5rem; padding: 20px;">New Game</button>
 </div>
 
@@ -99,10 +91,10 @@
     </ul>
     <h3>2. Tournament Progression</h3>
     <ul>
-      <li>Qualifiers: All the Teams</li>
-      <li>Quarterfinals: Top 8 Teams</li>
-      <li>Semifinals: Top 4 Teams</li>
-      <li>Finals: Top 2 Teams</li>
+      <li><strong>Qualifiers:</strong> All the Teams</li>
+      <li><strong>Quarterfinals:</strong> Top 8 Teams</li>
+      <li><strong>Semifinals:</strong> Top 4 Teams</li>
+      <li><strong>Finals:</strong> Top 2 Teams</li>
     </ul>
     <h3>3. Tie-Breakers</h3>
     <ul>
@@ -119,7 +111,7 @@
     <p>Upload <strong>Teams.csv</strong> (First row must be "Teams")</p>
     <input type="file" id="teamsFile" accept=".csv">
   </div>
-  <div id="teams-list-admin" style="margin: 15px 0; text-align: left; max-height: 200px; overflow-y: auto;"></div>
+  <div id="teams-list-admin" style="margin: 15px 0; text-align: left; max-height: 200px;"></div>
   <button id="btnDisplayTeams" class="display-btn">Display Teams to Audience</button>
 </div>
 
@@ -162,33 +154,39 @@
 <script src="storage.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-  let logHandle = null; // Background handle for appending
   let STATE = loadState() || {
     displayMode: "welcome", 
     round: 1, teams: [], pairs: [], matchIndex: 0,
     questionsPool: [], currentQuestion: null, revealed: [], 
     isMatchLive: false, matchWinner: null, matchScores: [0, 0],
-    matchHighPointAnswerIdx: [null, null],
-    gameName: ""
+    matchHighPointAnswerIdx: [null, null]
   };
 
   const ROUND_NAMES = { 1: "Qualifiers", 2: "Quarterfinals", 3: "Semifinals", 4: "Finals" };
   const ADVANCEMENT = { 1: 8, 2: 4, 3: 2, 4: 1 };
 
-  /* LOGGING ENGINE */
-  async function writeLog(text) {
-    if (!logHandle) return;
+  // --- LOGGING ENGINE ---
+  let fileHandle = null;
+
+  async function appendToLog(text) {
+    if (!fileHandle) return;
     try {
-      const writable = await logHandle.createWritable({ keepExistingData: true });
-      const file = await logHandle.getFile();
-      await writable.write({ type: 'write', position: file.size, data: text + "\n" });
+      const writable = await fileHandle.createWritable({ keepExistingData: true });
+      const file = await fileHandle.getFile();
+      await writable.seek(file.size);
+      await writable.write(text);
       await writable.close();
-    } catch (e) { console.error("Logging Append Failed:", e); }
+    } catch (e) {
+      console.warn("Log Append Failed:", e);
+    }
   }
 
   function resetStatusUI() {
     const status = document.getElementById("admin-status");
-    if(status) { status.textContent = "ADMIN PREVIEW - NOT ON AUDIENCE"; status.style.background = "#f5c542"; }
+    if(status) {
+      status.textContent = "ADMIN PREVIEW - NOT ON AUDIENCE";
+      status.style.background = "#f5c542";
+    }
     STATE.isMatchLive = false;
   }
 
@@ -196,8 +194,10 @@ document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll('.card').forEach(c => c.classList.add("hidden"));
     document.getElementById(id).classList.remove("hidden");
     document.getElementById("current-tab-indicator").textContent = tabName;
+    
     if(id === "view-leaderboard") updateAdminLeaderboard();
     if(id === "view-podium") updateAdminPodium(); 
+
     document.querySelectorAll('.nav-btn').forEach(btn => {
         btn.classList.toggle('active-tab', btn.textContent === tabName || btn.id.includes(id.split('-')[1]));
     });
@@ -215,9 +215,21 @@ document.addEventListener("DOMContentLoaded", () => {
     const preview = document.getElementById("admin-podium-preview");
     const sorted = [...STATE.teams].sort((a,b) => b.score - a.score || a.order - b.order);
     preview.innerHTML = `
-      <div class="admin-podium-slot" style="height: 100px;">🥈 ${sorted[1]?.name || "-"}</div>
-      <div class="admin-podium-slot" style="height: 140px; font-weight: bold;">🥇 ${sorted[0]?.name || "-"}</div>
-      <div class="admin-podium-slot" style="height: 80px;">🥉 ${sorted[2]?.name || "-"}</div>
+      <div class="admin-podium-slot" style="height: 100px;">
+        <div style="font-size: 1.5rem;">🥈</div>
+        <div style="font-weight: bold;">${sorted[1]?.name || "-"}</div>
+        <div style="font-size: 0.8rem;">${sorted[1]?.score || 0} PTS</div>
+      </div>
+      <div class="admin-podium-slot" style="height: 140px; border-width: 3px;">
+        <div style="font-size: 2rem;">🥇</div>
+        <div style="font-weight: bold;">${sorted[0]?.name || "-"}</div>
+        <div style="font-size: 0.9rem;">${sorted[0]?.score || 0} PTS</div>
+      </div>
+      <div class="admin-podium-slot" style="height: 80px;">
+        <div style="font-size: 1.2rem;">🥉</div>
+        <div style="font-weight: bold;">${sorted[2]?.name || "-"}</div>
+        <div style="font-size: 0.8rem;">${sorted[2]?.score || 0} PTS</div>
+      </div>
     `;
   }
 
@@ -248,64 +260,89 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("btnDisplayLeaderboard").onclick = () => { STATE.displayMode = "leaderboard"; broadcast(STATE); saveState(STATE); };
   document.getElementById("btnDisplayPodium").onclick = () => { STATE.displayMode = "podium"; broadcast(STATE); saveState(STATE); };
 
-  /* NEW GAME & LOG INIT */
   document.getElementById("newGameBtn").onclick = async () => {
-    const name = document.getElementById("gameNameInput").value.trim();
-    if(!name) return alert("Please enter a Game Name.");
-    if(!confirm("Start a new game? Current data will be reset.")) return;
-    
+    // Check for API support first
+    if (!window.showSaveFilePicker) {
+      alert("Error: Your browser does not support the File System API. Please use Chrome or Edge.");
+      return;
+    }
+
+    const gInput = document.getElementById("gameNameInput");
+    const gameName = gInput && gInput.value.trim() !== "" ? gInput.value.trim() : "Untitled Game";
+
     try {
-      // One-time Save Dialog
-      logHandle = await window.showSaveFilePicker({
-        suggestedName: `${name.replace(/\s+/g, '_')}.txt`,
-        types: [{ description: 'Text File', accept: { 'text/plain': ['.txt'] } }]
+      // 1. Prompt for File Save
+      fileHandle = await window.showSaveFilePicker({
+        suggestedName: `${gameName.replace(/\s+/g, '_')}_Log.txt`,
+        types: [{ description: 'Text File', accept: {'text/plain': ['.txt']} }]
       });
+
+      // 2. Immediate Logic Transition
+      window.open("audience.html", "_blank");
       
+      // Clear and Initialize State
       clearState();
       STATE = {
-        displayMode: "teams", 
-        round: 1, teams: [], pairs: [], matchIndex: 0,
+        displayMode: "welcome", round: 1, teams: [], pairs: [], matchIndex: 0,
         questionsPool: [], currentQuestion: null, revealed: [], 
         isMatchLive: false, matchWinner: null, matchScores: [0, 0],
-        matchHighPointAnswerIdx: [null, null], gameName: name
+        matchHighPointAnswerIdx: [null, null]
       };
-      
-      await writeLog(`Game: ${STATE.gameName}\n`);
-      
-      // FIXED: Immediate transition logic
-      document.getElementById("taskbar").classList.remove("hidden");
-      updateTaskbar();
+
+      // UI Transition: Show Teams & Taskbar
       showView("view-teams", "Teams");
+      document.getElementById("taskbar").classList.remove("hidden");
+      document.getElementById("teams-list-admin").innerHTML = "";
+      document.getElementById("start-section").classList.add("hidden");
+      document.getElementById("upload-section").classList.remove("hidden");
       
-      window.open("audience.html", "_blank");
+      updateTaskbar();
       broadcast(STATE);
       saveState(STATE);
-    } catch (e) { console.error("Initialization Interrupted", e); }
+
+      // 3. Log Game Name Background
+      appendToLog(`Game: ${gameName}\n\n`);
+
+    } catch (err) {
+      console.error(err);
+      if (err.name !== 'AbortError') alert("Could not initialize Log file: " + err.message);
+    }
   };
 
   document.getElementById("teamsFile").onchange = e => {
-    const fileName = e.target.files[0].name;
-    parseCSV(e.target.files[0], async rows => {
-      if (!rows[0] || rows[0][0].trim() !== "Teams") return alert("Header must be 'Teams'");
+    const file = e.target.files[0];
+    if(!file) return;
+    parseCSV(file, rows => {
+      if (!rows[0] || rows[0][0].trim() !== "Teams") {
+        alert("CRITICAL ERROR: Invalid file. The first row must be 'Teams'.");
+        e.target.value = ""; return;
+      }
       const teamData = rows.slice(1).filter(r => r[0] && r[0].trim() !== "");
+      if (teamData.length % 2 !== 0) {
+        alert("Error: Team list must have an EVEN number of teams.");
+        e.target.value = ""; return;
+      }
       STATE.teams = teamData.map((r, i) => ({ name: r[0].trim(), score: 0, order: i, qualified: true }));
-      
-      // LOG TEAMS
-      let log = `\nTeams:\nTeam List: ${fileName}\n`;
-      STATE.teams.forEach(t => log += `${t.name}\n`);
-      await writeLog(log);
-
       document.getElementById("teams-list-admin").innerHTML = STATE.teams.map(t => `<div>• ${t.name}</div>`).join("");
-      document.getElementById("taskbar").classList.remove("hidden");
+      
+      // Log Trigger: Teams
+      let teamLog = `Teams:\nTeam List: ${file.name}\n` + STATE.teams.map(t => t.name).join("\n") + "\n\n";
+      appendToLog(teamLog);
+
       updateTaskbar();
       saveState(STATE);
     });
   };
 
   document.getElementById("questionsFile").onchange = e => {
-    const fileName = e.target.files[0].name;
-    parseCSV(e.target.files[0], async rows => {
-      if (!rows[0] || rows[0].map(h => h.trim()).join(",") !== "Question,Answer,Points") return alert("Invalid Question Header");
+    const file = e.target.files[0];
+    if(!file) return;
+    parseCSV(file, rows => {
+      const header = rows[0].map(h => h.trim()).join(",");
+      if (header !== "Question,Answer,Points") {
+        alert("CRITICAL ERROR: Header must be Question,Answer,Points");
+        e.target.value = ""; return;
+      }
       const grouped = {};
       rows.slice(1).forEach(r => {
         if (r[0] && r[0].trim() !== "") {
@@ -314,12 +351,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       });
       STATE.questionsPool = Object.entries(grouped).map(([q, a]) => ({ question: q, answers: a }));
-      
-      // LOG ROUND START
-      await writeLog(`\nRound: ${ROUND_NAMES[STATE.round]}\nQuestion List: ${fileName}\n`);
-
       document.getElementById("upload-section").classList.add("hidden");
       document.getElementById("start-section").classList.remove("hidden");
+      
+      // Log Trigger: Round Setup
+      appendToLog(`Round: ${ROUND_NAMES[STATE.round]}\nQuestion List: ${file.name}\n\n`);
       saveState(STATE);
     });
   };
@@ -328,7 +364,9 @@ document.addEventListener("DOMContentLoaded", () => {
     STATE.matchIndex = 0;
     const activeTeams = STATE.teams.filter(t => t.qualified);
     STATE.pairs = [];
-    for(let i=0; i < activeTeams.length; i+=2) { if(activeTeams[i+1]) STATE.pairs.push([activeTeams[i], activeTeams[i+1]]); }
+    for(let i=0; i < activeTeams.length; i+=2) {
+      if(activeTeams[i+1]) STATE.pairs.push([activeTeams[i], activeTeams[i+1]]);
+    }
     STATE.displayMode = "round-start";
     broadcast(STATE);
     prepareMatch();
@@ -338,25 +376,13 @@ document.addEventListener("DOMContentLoaded", () => {
     resetStatusUI(); 
     STATE.matchWinner = null; STATE.matchScores = [0, 0];
     STATE.matchHighPointAnswerIdx = [null, null];
-    if (STATE.questionsPool.length === 0) return alert("No questions left!");
+    if (STATE.questionsPool.length === 0) return alert("No questions left in pool!");
     STATE.currentQuestion = STATE.questionsPool.splice(Math.floor(Math.random() * STATE.questionsPool.length), 1)[0];
     STATE.revealed = [];
     renderMatch();
     showView("view-match", ROUND_NAMES[STATE.round]);
     saveState(STATE);
   }
-
-  document.getElementById("btnDisplayMatch").onclick = async () => { 
-    STATE.displayMode = "match"; STATE.isMatchLive = true; 
-    document.getElementById("admin-status").textContent = "LIVE ON AUDIENCE";
-    document.getElementById("admin-status").style.background = "#22c55e";
-    
-    // LOG MATCH START
-    const pair = STATE.pairs[STATE.matchIndex];
-    await writeLog(`\nMatch: ${pair[0].name} Vs ${pair[1].name}\nQuestion: ${STATE.currentQuestion.question}\n`);
-    
-    broadcast(STATE); saveState(STATE);
-  };
 
   function renderMatch() {
     const pair = STATE.pairs[STATE.matchIndex];
@@ -374,29 +400,25 @@ document.addEventListener("DOMContentLoaded", () => {
     `).join("");
   }
 
-  window.award = async (ansIdx, teamIdxInPair) => {
+  window.award = (ansIdx, teamIdxInPair) => {
     if (!STATE.isMatchLive) return alert("Click 'Display Match to Audience' first!");
     if (STATE.revealed.find(r => r.idx === ansIdx)) return;
     
-    const ansText = STATE.currentQuestion.answers[ansIdx].text;
-    const points = STATE.currentQuestion.answers[ansIdx].points;
+    const ans = STATE.currentQuestion.answers[ansIdx];
     const pair = STATE.pairs[STATE.matchIndex];
-    let winnerName = "Empty Reveal";
-    let awardedPts = 0;
-
-    if (teamIdxInPair !== null) {
-      winnerName = pair[teamIdxInPair].name;
-      awardedPts = points;
-      STATE.teams.find(t => t.name === winnerName).score += points;
-      STATE.matchScores[teamIdxInPair] += points;
-      const curMax = STATE.matchHighPointAnswerIdx[0] !== null ? STATE.currentQuestion.answers[STATE.matchHighPointAnswerIdx[0]].points : -1;
-      if (points > curMax) STATE.matchHighPointAnswerIdx = [ansIdx, teamIdxInPair];
-    }
+    let winnerName = (teamIdxInPair !== null) ? pair[teamIdxInPair].name : "Empty Reveal";
     
-    // LOG EACH ANSWER
-    await writeLog(`${ansText} : ${winnerName} -> ${awardedPts}`);
-
+    if (teamIdxInPair !== null) {
+      STATE.teams.find(t => t.name === winnerName).score += ans.points;
+      STATE.matchScores[teamIdxInPair] += ans.points;
+      const curMax = STATE.matchHighPointAnswerIdx[0] !== null ? STATE.currentQuestion.answers[STATE.matchHighPointAnswerIdx[0]].points : -1;
+      if (ans.points > curMax) STATE.matchHighPointAnswerIdx = [ansIdx, teamIdxInPair];
+    }
     STATE.revealed.push({ idx: ansIdx, winnerName: winnerName });
+    
+    // Log Trigger: Answer
+    appendToLog(`${ans.text} : ${winnerName} -> ${ans.points}\n`);
+
     broadcast(STATE); saveState(STATE);
 
     if (STATE.revealed.length === STATE.currentQuestion.answers.length) {
@@ -404,40 +426,44 @@ document.addEventListener("DOMContentLoaded", () => {
       else if (STATE.matchScores[1] > STATE.matchScores[0]) STATE.matchWinner = pair[1].name;
       else STATE.matchWinner = (STATE.matchHighPointAnswerIdx[1] !== null) ? pair[STATE.matchHighPointAnswerIdx[1]].name : "DRAW!";
       
-      STATE.displayMode = "match-winner";
-      
-      // LOG MATCH SUMMARY
-      const winTeam = STATE.teams.find(t => t.name === STATE.matchWinner);
-      await writeLog(`\n${pair[0].name} ${STATE.matchScores[0]}\n${pair[1].name} ${STATE.matchScores[1]}\nWinner: ${STATE.matchWinner} => ${winTeam ? winTeam.score : 0}`);
+      // Log Trigger: Match Result
+      let winnerTotal = STATE.teams.find(t => t.name === STATE.matchWinner)?.score || 0;
+      appendToLog(`\n${pair[0].name} ${STATE.matchScores[0]}\n${pair[1].name} ${STATE.matchScores[1]}\nWinner: ${STATE.matchWinner} => ${winnerTotal}\n\n`);
 
+      STATE.displayMode = "match-winner";
       broadcast(STATE); saveState(STATE);
       setTimeout(() => {
         if (STATE.matchIndex < STATE.pairs.length - 1) { 
           STATE.matchIndex++; STATE.displayMode = "leaderboard";
           broadcast(STATE); prepareMatch(); 
-        } else { resetStatusUI(); alert("Round matches finished!"); }
+        } else alert("Round matches finished!");
       }, 5000);
     }
   };
 
-  document.getElementById("endRoundBtn").onclick = async () => {
-    const roundName = ROUND_NAMES[STATE.round];
+  document.getElementById("btnDisplayMatch").onclick = () => { 
+    STATE.displayMode = "match"; STATE.isMatchLive = true; 
+    document.getElementById("admin-status").textContent = "LIVE ON AUDIENCE";
+    document.getElementById("admin-status").style.background = "#22c55e";
+    
+    // Log Trigger: Match Start
+    const pair = STATE.pairs[STATE.matchIndex];
+    appendToLog(`Match: ${pair[0].name} Vs ${pair[1].name}\nQuestion: ${STATE.currentQuestion.question}\n\n`);
+
+    broadcast(STATE); saveState(STATE);
+  };
+
+  document.getElementById("endRoundBtn").onclick = () => {
     resetStatusUI();
     const limit = ADVANCEMENT[STATE.round];
     const sorted = [...STATE.teams].sort((a,b) => b.score - a.score || a.order - b.order);
     STATE.teams.forEach(t => t.qualified = false);
     sorted.slice(0, limit).forEach(t => STATE.teams.find(orig => orig.name === t.name).qualified = true);
     
-    // LOG ROUND LEADERBOARD
-    let log = `\n${roundName} Over\n\nLeaderBoard:\n`;
-    sorted.forEach((t, i) => {
-        log += `${i+1}) ${t.name} : ${t.score} => (${i < limit ? "Selected" : "Eliminated"})\n`;
-    });
-
-    if (STATE.round === 4) {
-      log += `\nGame Winners\nFirst: ${sorted[0].name} : ${sorted[0].score}\nSecond: ${sorted[1].name} : ${sorted[1].score}\nThird: ${sorted[2].name} : ${sorted[2].score}\n`;
-    }
-    await writeLog(log);
+    // Log Trigger: Leaderboard
+    let lbLog = `${ROUND_NAMES[STATE.round]} Over\n\nLeaderBoard:\n`;
+    sorted.forEach((t, i) => lbLog += `${i+1}) ${t.name} : ${t.score} => (${t.qualified ? 'Selected' : 'Eliminated'})\n`);
+    appendToLog(lbLog + "\n");
 
     STATE.displayMode = "round-complete";
     broadcast(STATE); saveState(STATE);
@@ -446,16 +472,34 @@ document.addEventListener("DOMContentLoaded", () => {
           STATE.round++; STATE.currentQuestion = null; STATE.questionsPool = [];
           document.getElementById("upload-section").classList.remove("hidden");
           document.getElementById("start-section").classList.add("hidden");
-          document.getElementById("questionsFile").value = ""; 
           showView("view-leaderboard", "Leaderboard");
-        } else showView("view-podium", "Podium");
+        } else {
+          showView("view-podium", "Podium");
+          // Log Trigger: Final Podium
+          let pod = `Game Winners\nFirst: ${sorted[0].name} : ${sorted[0].score}\nSecond: ${sorted[1].name} : ${sorted[1].score}\nThird: ${sorted[2].name} : ${sorted[2].score}\n`;
+          appendToLog(pod);
+        }
         updateTaskbar(); saveState(STATE);
     }, 4000);
   };
 
-  document.getElementById("nextQuestionBtn").onclick = () => { STATE.questionsPool.push(STATE.currentQuestion); prepareMatch(); };
-  function updateTaskbar() { [1,2,3,4].forEach(r => { const btn = document.getElementById(`nav-r${r}`); btn.disabled = (STATE.round !== r); btn.classList.toggle("active-tab", STATE.round === r); }); }
-  function parseCSV(file, cb) { const r = new FileReader(); r.onload = () => cb(r.result.trim().split("\n").map(l => l.split(","))); r.readAsText(file); }
+  document.getElementById("nextQuestionBtn").onclick = () => {
+    STATE.questionsPool.push(STATE.currentQuestion); prepareMatch();
+  };
+
+  function updateTaskbar() {
+    [1,2,3,4].forEach(r => {
+      const btn = document.getElementById(`nav-r${r}`);
+      btn.disabled = (STATE.round !== r);
+      btn.classList.toggle("active-tab", STATE.round === r);
+    });
+  }
+
+  function parseCSV(file, cb) {
+    const r = new FileReader();
+    r.onload = () => cb(r.result.trim().split("\n").map(l => l.split(",").map(c => c ? c.trim() : "")));
+    r.readAsText(file);
+  }
 });
 </script>
 </body>
