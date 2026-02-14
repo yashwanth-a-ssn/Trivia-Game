@@ -1,0 +1,49 @@
+Game: <GameName Entered by user>
+
+--------------------------------------------------------------------------------------------------------------
+
+Teams:
+Team List: <Teams List File name uploaded>
+
+<Team 1 Name>
+<Team 2 Name>
+
+--------------------------------------------------------------------------------------------------------------
+
+Round: <RoundName>
+
+
+Question List: <Question List File name uploaded>
+
+Match: <Team 1 Name> Vs <Team 2 Name>
+Question: <Current Question>
+
+<Answer No>) <Answer 1> : <Team Name or Empty Reveal> -> <Points Awarded>
+<Answer No>) <Answer 2> : <Team Name or Empty Reveal> -> <Points Awarded>
+<Answer No>) <Answer 3> : <Team Name or Empty Reveal> -> <Points Awarded>
+<Answer No>) <Answer 4> : <Team Name or Empty Reveal> -> <Points Awarded>
+<Answer No>) <Answer 5> : <Team Name or Empty Reveal> -> <Points Awarded>
+
+<Team 1 Name> => <Current Match Points> Points
+<Team 2 Name> => <Current Match Points> Points
+Winner: <Winning Team Name> => <Cumulative Points> Points
+
+--------------------------------------------------------------------------------------------------------------
+
+<RoundName Over>
+
+--------------------------------------------------------------------------------------------------------------
+
+LeaderBoard:
+1) <TeamName> : <Points> => (Selected)
+...
+9) <TeamName> : <Points> => (Eliminated)
+
+--------------------------------------------------------------------------------------------------------------
+
+Game Winners
+First: <TeamName> : <Points> Points
+Second: <TeamName> : <Points> Points
+Third: <TeamName> : <Points> Points
+
+--------------------------------------------------------------------------------------------------------------
