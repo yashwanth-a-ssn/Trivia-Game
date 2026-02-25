@@ -85,21 +85,25 @@
   <div class="rules-scroll" style="text-align: left; max-height: 400px; padding: 10px;">
     <h3>1. Scoring</h3>
     <ul>
-      <li><strong>Response Values:</strong> Correct reveals earn 1 to 5 points based on popularity.</li>
-      <li><strong>Point Spread:</strong> The most popular response earns 5 points; the least earns 1 point.</li>
-      <li><strong>Total Score:</strong> All points are cumulative throughout the entire tournament.</li>
+      <li><strong>Response Values:</strong> Correct Answer Reveal Earn 1 to 5 Points Based on Popularity.</li>
+      <li><strong>Round-Wise Scores:</strong> Scores will be Reset at the Start of Each Round.</li>
+      <li><strong>Round Winner:</strong> Team with Highest Consolidated Score in that Round.</li>
+      <li><strong>Game Winner:</strong> Final Round Winner.</li>
     </ul>
     <h3>2. Tournament Progression</h3>
     <ul>
-      <li><strong>Qualifiers:</strong> All the Teams</li>
-      <li><strong>Quarterfinals:</strong> Top 8 Teams</li>
-      <li><strong>Semifinals:</strong> Top 4 Teams</li>
-      <li><strong>Finals:</strong> Top 2 Teams</li>
+      <li><strong>Qualifiers:</strong> Custom Number of Questions (All the Teams)</li>
+      <li><strong>Quarterfinals:</strong> 3 Questions (Top 8 Teams)</li>
+      <li><strong>Semifinals:</strong> 5 Questions (Top 4 Teams)</li>
+      <li><strong>Finals:</strong> 5 Questions (Top 2 Teams)</li>
     </ul>
     <h3>3. Tie-Breakers</h3>
     <ul>
-      <li><strong>Match Ties:</strong> Victory is awarded to the team with the highest-point single answer in that match.</li>
-      <li><strong>Tournament Ties:</strong> Decided by the total count of 5-point answers, then by the highest Qualifier score.</li>
+      <li><strong>Match Ties:</strong> Team with Highest Number of Question Win will be Selected as the Winner if the Total Scores in that Round Remains the Same and if the Question Win is Equal, Team who Won the First Question will be the Winner.</li>
+    </ul>
+    <h3>4. Match Making</h3>
+    <ul>
+      <li><strong>Forthcoming Rounds:</strong> Match will be Set Between Consecutive Teams in the Leaderboard of Previous Round.</li>
     </ul>
   </div>
   <button id="btnDisplayRules" class="display-btn">Display Rules to Audience</button>
@@ -117,6 +121,12 @@
 
 <div id="view-setup" class="card hidden">
   <h2 id="setupTitle">Round Setup</h2>
+  
+  <div id="q-config-section" style="margin-bottom: 20px;">
+    <label>Questions Per Match: </label>
+    <input type="number" id="questionsPerMatchInput" value="1" min="1" style="width: 60px; padding: 5px; font-size: 1.2rem; text-align: center;">
+  </div>
+
   <div id="upload-section">
     <label id="qLabel">Upload Questions CSV (Header: Question,Answer,Points)</label><br>
     <input type="file" id="questionsFile" accept=".csv">
@@ -129,12 +139,13 @@
 <div id="view-match" class="card hidden">
   <div id="admin-status" style="background: #f5c542; color: #000; padding: 5px; font-weight: bold; margin-bottom: 10px;">ADMIN PREVIEW - NOT ON AUDIENCE</div>
   <h2 id="matchHeader"></h2>
+  <div id="matchQCounter" style="color: #aaa; font-size: 0.9rem; margin-bottom: 5px;"></div>
   <h3 id="questionText"></h3>
   <div id="answers"></div>
   <div class="controls">
     <button id="btnDisplayMatch" class="display-btn" style="background: #3b82f6; color: white;">Display Match to Audience</button>
-    <button id="nextQuestionBtn">Swap Question</button>
-    <button id="endRoundBtn" style="background: #ff4444; color: white;">Complete Round</button>
+    <button id="nextQuestionBtn">Next Question / Finish Match</button>
+    <button id="endRoundBtn" class="hidden" style="background: #ff4444; color: white;">Complete Round</button>
   </div>
 </div>
 
@@ -154,15 +165,29 @@
 <script src="storage.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
+  // STATE MANAGEMENT
   let STATE = loadState() || {
     displayMode: "welcome", 
-    round: 1, teams: [], pairs: [], matchIndex: 0,
-    questionsPool: [], currentQuestion: null, revealed: [], 
-    isMatchLive: false, matchWinner: null, matchScores: [0, 0],
-    matchHighPointAnswerIdx: [null, null]
+    round: 1, 
+    teams: [], 
+    pairs: [], 
+    matchIndex: 0,
+    questionsPool: [], 
+    currentQuestion: null, 
+    revealed: [], 
+    isMatchLive: false, 
+    matchWinner: null, 
+    matchScores: [0, 0],
+    
+    // New State Variables for Multi-Question Matches & Tie Breakers
+    questionsPerMatch: 1,
+    currentMatchQuestionNum: 0, // 1-based index
+    matchQuestionWins: [0, 0], // [Team0 Wins, Team1 Wins]
+    firstQuestionWinnerIdx: null // 0 or 1
   };
 
   const ROUND_NAMES = { 1: "Qualifiers", 2: "Quarterfinals", 3: "Semifinals", 4: "Finals" };
+  const ROUND_Q_COUNTS = { 2: 3, 3: 5, 4: 5 }; // Preset counts for non-qualifiers
   const ADVANCEMENT = { 1: 8, 2: 4, 3: 2, 4: 1 };
   const HR = "--------------------------------------------------------------------------------------------------------------\n";
 
@@ -177,11 +202,10 @@ document.addEventListener("DOMContentLoaded", () => {
       await writable.seek(file.size);
       await writable.write(text);
       await writable.close();
-    } catch (e) {
-      console.warn("Log Append Failed:", e);
-    }
+    } catch (e) { console.warn("Log Append Failed:", e); }
   }
 
+  // --- UI NAVIGATION ---
   function resetStatusUI() {
     const status = document.getElementById("admin-status");
     if(status) {
@@ -196,11 +220,19 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById(id).classList.remove("hidden");
     document.getElementById("current-tab-indicator").textContent = tabName;
     
-    // Fix: Ensure Start Section is visible if return to Setup mid-round
     if (id === "view-setup") {
         const hasData = STATE.questionsPool && STATE.questionsPool.length > 0;
         document.getElementById("upload-section").classList.toggle("hidden", hasData);
         document.getElementById("start-section").classList.toggle("hidden", !hasData);
+        
+        // Handle Question Count Input Logic
+        const qInput = document.getElementById("questionsPerMatchInput");
+        if (STATE.round === 1) {
+            qInput.disabled = false;
+        } else {
+            qInput.value = ROUND_Q_COUNTS[STATE.round];
+            qInput.disabled = true;
+        }
     }
 
     if(id === "view-leaderboard") updateAdminLeaderboard();
@@ -213,6 +245,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function updateAdminLeaderboard() {
     const list = document.getElementById("admin-leaderboard-list");
+    // Sort by Score DESC
     const sorted = [...STATE.teams].sort((a,b) => b.score - a.score || a.order - b.order);
     list.innerHTML = sorted.map((t, i) => `
       <div class="admin-lb-item"><span>#${i+1} ${t.name}</span><strong>${t.score} PTS</strong></div>
@@ -241,6 +274,7 @@ document.addEventListener("DOMContentLoaded", () => {
     `;
   }
 
+  // --- INITIALIZATION & EVENTS ---
   if (STATE.teams.length > 0) {
     document.getElementById("taskbar").classList.remove("hidden");
     updateTaskbar();
@@ -263,31 +297,14 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   });
 
-  // FLOW: Display Rules -> Go to Teams
-  document.getElementById("btnDisplayRules").onclick = () => { 
-    STATE.displayMode = "rules"; 
-    broadcast(STATE); 
-    saveState(STATE); 
-    showView("view-teams", "Teams");
-  };
-
-  // FLOW: Display Teams -> Go to Setup
-  document.getElementById("btnDisplayTeams").onclick = () => { 
-    STATE.displayMode = "teams"; 
-    broadcast(STATE); 
-    saveState(STATE); 
-    showView("view-setup", `${ROUND_NAMES[STATE.round]} Setup`);
-  };
-
+  document.getElementById("btnDisplayRules").onclick = () => { STATE.displayMode = "rules"; broadcast(STATE); saveState(STATE); showView("view-teams", "Teams"); };
+  document.getElementById("btnDisplayTeams").onclick = () => { STATE.displayMode = "teams"; broadcast(STATE); saveState(STATE); showView("view-setup", `${ROUND_NAMES[STATE.round]} Setup`); };
   document.getElementById("btnDisplayLeaderboard").onclick = () => { STATE.displayMode = "leaderboard"; broadcast(STATE); saveState(STATE); };
   document.getElementById("btnDisplayPodium").onclick = () => { STATE.displayMode = "podium"; broadcast(STATE); saveState(STATE); };
 
+  // NEW GAME
   document.getElementById("newGameBtn").onclick = async () => {
-    if (!window.showSaveFilePicker) {
-      alert("Error: Your browser does not support the File System API. Please use Chrome or Edge.");
-      return;
-    }
-
+    if (!window.showSaveFilePicker) return alert("Please use Chrome or Edge for File Access.");
     const gInput = document.getElementById("gameNameInput");
     const gameName = gInput && gInput.value.trim() !== "" ? gInput.value.trim() : "Untitled Game";
 
@@ -304,7 +321,8 @@ document.addEventListener("DOMContentLoaded", () => {
         displayMode: "welcome", round: 1, teams: [], pairs: [], matchIndex: 0,
         questionsPool: [], currentQuestion: null, revealed: [], 
         isMatchLive: false, matchWinner: null, matchScores: [0, 0],
-        matchHighPointAnswerIdx: [null, null]
+        questionsPerMatch: 1, currentMatchQuestionNum: 0, 
+        matchQuestionWins: [0, 0], firstQuestionWinnerIdx: null
       };
 
       showView("view-rules", "Rules");
@@ -319,33 +337,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
       await appendToLog(`Game: ${gameName}\n\n${HR}\n`);
 
-    } catch (err) {
-      console.error(err);
-      if (err.name !== 'AbortError') alert("Could not initialize Log file: " + err.message);
-    }
+    } catch (err) { console.error(err); }
   };
 
+  // FILE PARSING
   document.getElementById("teamsFile").onchange = e => {
     const file = e.target.files[0];
     if(!file) return;
     parseCSV(file, rows => {
-      if (!rows[0] || rows[0][0].trim() !== "Teams") {
-        alert("CRITICAL ERROR: Invalid file. The first row must be 'Teams'.");
-        e.target.value = ""; return;
-      }
+      if (!rows[0] || rows[0][0].trim() !== "Teams") return alert("First row must be 'Teams'");
       const teamData = rows.slice(1).filter(r => r[0] && r[0].trim() !== "");
-      if (teamData.length % 2 !== 0) {
-        alert("Error: Team list must have an EVEN number of teams.");
-        e.target.value = ""; return;
-      }
+      if (teamData.length % 2 !== 0) return alert("Even number of teams required.");
+      
       STATE.teams = teamData.map((r, i) => ({ name: r[0].trim(), score: 0, order: i, qualified: true }));
       document.getElementById("teams-list-admin").innerHTML = STATE.teams.map(t => `<div>• ${t.name}</div>`).join("");
       
       let teamLog = `Teams:\nTeam List: ${file.name}\n\n` + STATE.teams.map(t => t.name).join("\n") + `\n\n${HR}\n`;
       appendToLog(teamLog);
-
-      updateTaskbar();
-      saveState(STATE);
+      updateTaskbar(); saveState(STATE);
     });
   };
 
@@ -354,10 +363,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if(!file) return;
     parseCSV(file, rows => {
       const header = rows[0].map(h => h.trim()).join(",");
-      if (header !== "Question,Answer,Points") {
-        alert("CRITICAL ERROR: Header must be Question,Answer,Points");
-        e.target.value = ""; return;
-      }
+      if (header !== "Question,Answer,Points") return alert("Header must be Question,Answer,Points");
       const grouped = {};
       rows.slice(1).forEach(r => {
         if (r[0] && r[0].trim() !== "") {
@@ -370,16 +376,28 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("upload-section").classList.add("hidden");
       document.getElementById("start-section").classList.remove("hidden");
       
-      appendToLog(`Round: ${ROUND_NAMES[STATE.round]}\n\n\nQuestion List: ${file.name}\n\n`);
+      // LOGIC: Save the filename for logging later
+      STATE.qFileName = file.name;
       saveState(STATE);
     });
   };
 
-  document.getElementById("startRoundBtn").onclick = () => {
+  // --- START ROUND LOGIC ---
+  document.getElementById("startRoundBtn").onclick = async () => {
+    // 1. Configure Questions Per Match
+    const qInput = document.getElementById("questionsPerMatchInput");
+    STATE.questionsPerMatch = parseInt(qInput.value) || 1;
+
+    // 2. Log Round Start Info
+    let rLog = `Round: ${ROUND_NAMES[STATE.round]}\n` +
+               `No of Questions for this Round per Match: ${STATE.questionsPerMatch}\n\n` +
+               `Question List: ${STATE.qFileName || "Unknown"}\n\n\n`;
+    await appendToLog(rLog);
+
     STATE.matchIndex = 0;
     
-    // LOGIC FIX: Sort qualified teams by current Rank (Score) before pairing
-    // This ensures Rank 1 competes with Rank 2, Rank 3 with Rank 4, etc.
+    // 3. Pairing Logic: Sort by Score (Rank) then Pair Consecutive (1v2, 3v4)
+    // Note: Scores are based on previous round, we will reset them AFTER pairing
     const activeTeams = STATE.teams
         .filter(t => t.qualified)
         .sort((a,b) => b.score - a.score || a.order - b.order);
@@ -388,25 +406,60 @@ document.addEventListener("DOMContentLoaded", () => {
     for(let i=0; i < activeTeams.length; i+=2) {
       if(activeTeams[i+1]) STATE.pairs.push([activeTeams[i], activeTeams[i+1]]);
     }
-    
+
+    // 4. RESET SCORES FOR NEW ROUND (Flushing Leaderboard)
+    STATE.teams.forEach(t => t.score = 0);
+
     STATE.displayMode = "round-start";
     broadcast(STATE);
-    prepareMatch();
+    prepareMatchStart();
   };
 
-  function prepareMatch() {
+  // --- MATCH LOGIC ---
+
+  // Called once per Pair (Team A vs Team B)
+  function prepareMatchStart() {
+    STATE.currentMatchQuestionNum = 0;
+    STATE.matchScores = [0, 0]; 
+    STATE.matchQuestionWins = [0, 0];
+    STATE.firstQuestionWinnerIdx = null;
+    STATE.matchWinner = null;
+    
+    loadNextQuestionForMatch();
+  }
+
+  // Called for every Question within the match
+  function loadNextQuestionForMatch() {
     resetStatusUI(); 
-    STATE.matchWinner = null; STATE.matchScores = [0, 0];
-    STATE.matchHighPointAnswerIdx = [null, null];
+    
     if (STATE.questionsPool.length === 0) return alert("No questions left in pool!");
+    
+    STATE.currentMatchQuestionNum++;
     STATE.currentQuestion = STATE.questionsPool.splice(Math.floor(Math.random() * STATE.questionsPool.length), 1)[0];
     STATE.revealed = [];
-    renderMatch();
+    
+    // Update Admin UI
+    renderMatchUI();
     showView("view-match", ROUND_NAMES[STATE.round]);
+    
+    // Manage Buttons
+    document.getElementById("nextQuestionBtn").classList.add("hidden");
+    document.getElementById("endRoundBtn").classList.add("hidden");
+    document.getElementById("matchQCounter").textContent = `Question No: ${STATE.currentMatchQuestionNum}/${STATE.questionsPerMatch}`;
+    
+    // Log Match Start only on Q1
+    if (STATE.currentMatchQuestionNum === 1) {
+        const pair = STATE.pairs[STATE.matchIndex];
+        appendToLog(`Match: ${pair[0].name} Vs ${pair[1].name}\n\n\n`);
+    }
+
+    // Log Question Header
+    appendToLog(`Question No: ${STATE.currentMatchQuestionNum}/${STATE.questionsPerMatch}\nQuestion: ${STATE.currentQuestion.question}\n\n`);
+
     saveState(STATE);
   }
 
-  function renderMatch() {
+  function renderMatchUI() {
     const pair = STATE.pairs[STATE.matchIndex];
     document.getElementById("matchHeader").textContent = `${pair[0].name} vs ${pair[1].name}`;
     document.getElementById("questionText").textContent = STATE.currentQuestion.question;
@@ -430,42 +483,55 @@ document.addEventListener("DOMContentLoaded", () => {
     const pair = STATE.pairs[STATE.matchIndex];
     let winnerName = (teamIdxInPair !== null) ? pair[teamIdxInPair].name : "Empty Reveal";
     
+    // Award Points
     if (teamIdxInPair !== null) {
-      STATE.teams.find(t => t.name === winnerName).score += ans.points;
-      STATE.matchScores[teamIdxInPair] += ans.points;
-      const curMax = STATE.matchHighPointAnswerIdx[0] !== null ? STATE.currentQuestion.answers[STATE.matchHighPointAnswerIdx[0]].points : -1;
-      if (ans.points > curMax) STATE.matchHighPointAnswerIdx = [ansIdx, teamIdxInPair];
+      STATE.teams.find(t => t.name === winnerName).score += ans.points; // Global Round Score
+      STATE.matchScores[teamIdxInPair] += ans.points; // Local Match Score
     }
+    
     STATE.revealed.push({ idx: ansIdx, winnerName: winnerName });
     
-    appendToLog(`${STATE.revealed.length}) ${ans.text} : ${winnerName} -> ${ans.points}\n`);
+    // Log Answer
+    appendToLog(`${ansIdx + 1}) ${ans.text} : ${winnerName} -> ${ans.points}\n`);
 
     broadcast(STATE); saveState(STATE);
 
+    // Check if Question is complete (all answers revealed)
     if (STATE.revealed.length === STATE.currentQuestion.answers.length) {
-        setTimeout(async () => {
-            if (STATE.matchScores[0] > STATE.matchScores[1]) STATE.matchWinner = pair[0].name;
-            else if (STATE.matchScores[1] > STATE.matchScores[0]) STATE.matchWinner = pair[1].name;
-            else STATE.matchWinner = (STATE.matchHighPointAnswerIdx[1] !== null) ? pair[STATE.matchHighPointAnswerIdx[1]].name : "DRAW!";
-            
-            let winnerTotal = STATE.teams.find(t => t.name === STATE.matchWinner)?.score || 0;
-            let resultLog = `\n${pair[0].name} => ${STATE.matchScores[0]} Points\n` + 
-                            `${pair[1].name} => ${STATE.matchScores[1]} Points\n` + 
-                            `Winner: ${STATE.matchWinner} => ${winnerTotal} Points\n\n${HR}\n`;
-            await appendToLog(resultLog);
+        // Determine Question Winner for Tie-Breaker
+        // (Calculated by points won ONLY in this specific question, derived from revealed list)
+        // Simplified: We assume matchScores tracks cumulative. 
+        // For strict tie-breaker "Team who Won the First Question", we need per-question score.
+        // But for now, let's track "Question Wins" based on who got more points in this Q.
+        
+        let qScores = [0, 0];
+        STATE.revealed.forEach(r => {
+             const a = STATE.currentQuestion.answers[r.idx];
+             if(pair[0].name === r.winnerName) qScores[0] += a.points;
+             if(pair[1].name === r.winnerName) qScores[1] += a.points;
+        });
 
-            STATE.displayMode = "match-winner";
-            broadcast(STATE); saveState(STATE);
-            
-            setTimeout(() => {
-                if (STATE.matchIndex < STATE.pairs.length - 1) { 
-                  STATE.matchIndex++; 
-                  STATE.displayMode = "leaderboard";
-                  broadcast(STATE); 
-                  prepareMatch(); 
-                } else alert("Round matches finished!");
-            }, 5000);
-        }, 1000);
+        if (qScores[0] > qScores[1]) {
+            STATE.matchQuestionWins[0]++;
+            if(STATE.currentMatchQuestionNum === 1) STATE.firstQuestionWinnerIdx = 0;
+        } else if (qScores[1] > qScores[0]) {
+            STATE.matchQuestionWins[1]++;
+            if(STATE.currentMatchQuestionNum === 1) STATE.firstQuestionWinnerIdx = 1;
+        }
+
+        // Show Next button
+        const nextBtn = document.getElementById("nextQuestionBtn");
+        nextBtn.classList.remove("hidden");
+        
+        if (STATE.currentMatchQuestionNum < STATE.questionsPerMatch) {
+            nextBtn.textContent = "Next Question";
+            nextBtn.onclick = () => loadNextQuestionForMatch(); // Auto loop
+        } else {
+            nextBtn.textContent = "Finish Match";
+            nextBtn.onclick = () => finishMatch();
+        }
+        
+        appendToLog(`\n`); // Spacing after answers
     }
   };
 
@@ -473,54 +539,98 @@ document.addEventListener("DOMContentLoaded", () => {
     STATE.displayMode = "match"; STATE.isMatchLive = true; 
     document.getElementById("admin-status").textContent = "LIVE ON AUDIENCE";
     document.getElementById("admin-status").style.background = "#22c55e";
-    
-    const pair = STATE.pairs[STATE.matchIndex];
-    appendToLog(`Match: ${pair[0].name} Vs ${pair[1].name}\nQuestion: ${STATE.currentQuestion.question}\n\n`);
-
     broadcast(STATE); saveState(STATE);
   };
 
-  document.getElementById("endRoundBtn").onclick = () => {
+  async function finishMatch() {
+      const pair = STATE.pairs[STATE.matchIndex];
+      
+      // Determine Winner Logic (Rules 1 & 3)
+      // 1. Highest Score
+      if (STATE.matchScores[0] > STATE.matchScores[1]) STATE.matchWinner = pair[0].name;
+      else if (STATE.matchScores[1] > STATE.matchScores[0]) STATE.matchWinner = pair[1].name;
+      else {
+          // Tie-Breaker 1: Question Wins
+          if (STATE.matchQuestionWins[0] > STATE.matchQuestionWins[1]) STATE.matchWinner = pair[0].name;
+          else if (STATE.matchQuestionWins[1] > STATE.matchQuestionWins[0]) STATE.matchWinner = pair[1].name;
+          else {
+              // Tie-Breaker 2: First Question Winner
+              if (STATE.firstQuestionWinnerIdx === 0) STATE.matchWinner = pair[0].name;
+              else if (STATE.firstQuestionWinnerIdx === 1) STATE.matchWinner = pair[1].name;
+              else STATE.matchWinner = "DRAW (Coin Toss)"; // Fallback
+          }
+      }
+
+      const winnerObj = STATE.teams.find(t => t.name === STATE.matchWinner);
+      const winnerTotal = winnerObj ? winnerObj.score : 0;
+
+      // Log Results
+      let resultLog = `\n${pair[0].name} => ${STATE.matchScores[0]} Points\n` + 
+                      `${pair[1].name} => ${STATE.matchScores[1]} Points\n` + 
+                      `Winner: ${STATE.matchWinner} => ${winnerTotal} Points\n\n${HR}\n`;
+      await appendToLog(resultLog);
+
+      STATE.displayMode = "match-winner";
+      broadcast(STATE); saveState(STATE);
+
+      // Wait 5s then move to next pair or end round
+      setTimeout(() => {
+          if (STATE.matchIndex < STATE.pairs.length - 1) {
+              STATE.matchIndex++;
+              STATE.displayMode = "leaderboard";
+              broadcast(STATE);
+              prepareMatchStart();
+          } else {
+              alert("All Matches Complete for this Round!");
+              document.getElementById("endRoundBtn").classList.remove("hidden");
+              document.getElementById("nextQuestionBtn").classList.add("hidden");
+          }
+      }, 5000);
+  }
+
+  document.getElementById("endRoundBtn").onclick = async () => {
     resetStatusUI();
+    
+    // 1. Calculate Advancements based on this Round's Score
     const limit = ADVANCEMENT[STATE.round];
     const sorted = [...STATE.teams].sort((a,b) => b.score - a.score || a.order - b.order);
     
-    // LOGIC FIX: Strictly Advance only the top X teams based on the round limit
+    // Mark Qualification
     STATE.teams.forEach(t => t.qualified = false);
     sorted.slice(0, limit).forEach(t => {
         const team = STATE.teams.find(orig => orig.name === t.name);
         if (team) team.qualified = true;
     });
-    
+
+    // 2. Log Leaderboard
     let lbLog = `${ROUND_NAMES[STATE.round]} Over\n\n${HR}\nLeaderBoard:\n`;
-    sorted.forEach((t, i) => lbLog += `${i+1}) ${t.name} : ${t.score} => (${t.qualified ? 'Selected' : 'Eliminated'})\n`);
-    appendToLog(lbLog + `\n${HR}\n`);
+    sorted.forEach((t, i) => {
+        lbLog += `${i+1}) ${t.name} : ${t.score} => (${t.qualified ? 'Selected' : 'Eliminated'})\n`;
+    });
+    lbLog += `\n${HR}\n`;
+    await appendToLog(lbLog);
 
     STATE.displayMode = "round-complete";
     broadcast(STATE); saveState(STATE);
 
-    // Reset setup UI for next round
+    // 3. Prepare UI for Next Round
     document.getElementById("upload-section").classList.remove("hidden");
     document.getElementById("start-section").classList.add("hidden");
     document.getElementById("questionsFile").value = ""; 
 
-    setTimeout(() => {
+    setTimeout(async () => {
         if (STATE.round < 4) {
-          STATE.round++; 
-          STATE.currentQuestion = null; 
-          STATE.questionsPool = [];
-          showView("view-leaderboard", "Leaderboard");
+            STATE.round++; 
+            STATE.currentQuestion = null; 
+            STATE.questionsPool = [];
+            showView("view-leaderboard", "Leaderboard");
         } else {
-          showView("view-podium", "Podium");
-          let pod = `Game Winners\nFirst: ${sorted[0].name} : ${sorted[0].score} Points\nSecond: ${sorted[1].name} : ${sorted[1].score} Points\nThird: ${sorted[2].name} : ${sorted[2].score} Points\n\n${HR}\n`;
-          appendToLog(pod);
+            showView("view-podium", "Podium");
+            let pod = `Game Winners\nFirst: ${sorted[0].name} : ${sorted[0].score} Points\nSecond: ${sorted[1].name} : ${sorted[1].score} Points\nThird: ${sorted[2].name} : ${sorted[2].score} Points\n\n${HR}\n`;
+            await appendToLog(pod);
         }
         updateTaskbar(); saveState(STATE);
     }, 4000);
-  };
-
-  document.getElementById("nextQuestionBtn").onclick = () => {
-    STATE.questionsPool.push(STATE.currentQuestion); prepareMatch();
   };
 
   function updateTaskbar() {
@@ -537,7 +647,6 @@ document.addEventListener("DOMContentLoaded", () => {
     r.readAsText(file);
   }
 });
-
 </script>
 </body>
 </html>
