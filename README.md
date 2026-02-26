@@ -74,13 +74,15 @@ If the page is refreshed by accident:
 
 ## 📊 CSV Data Specifications
 
-### **Teams (`Teams.csv`)**
+### **Teams (Teams.csv)**
 * **Header**: The first cell must be exactly `Teams`.
 * **Constraint**: You must provide an **EVEN** number of teams for the pairing logic to function correctly.
+* **Resources**: Refer to `Teams_List_Format.csv` for the template and `Teams.csv` for a functional example.
 
-### **Questions (`Question_List.csv`)**
+### **Questions (Question_List.csv)**
 * **Header**: Must be exactly `Question,Answer,Points`.
 * **Scoring**: Supports 1 to 5 points based on response popularity.
+* **Resources**: Refer to `Question_List_Format.csv` for the template and `Question_List.csv` for a functional example.
 
 ---
 
