@@ -2,8 +2,9 @@ Game: <GameName Entered by user>
 
 --------------------------------------------------------------------------------------------------------------
 
-Teams:
 Team List: <Teams List File name uploaded>
+
+Teams:
 
 <Team 1 Name>
 <Team 2 Name>

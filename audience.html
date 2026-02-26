@@ -187,22 +187,36 @@
 
     listen(state => {
       const sidebar = document.getElementById("leaderboard-sidebar");
-      const hideSidebar = ["welcome", "rules", "teams", "podium", "round-start", "match-winner"].includes(state.displayMode);
-      sidebar.classList.toggle("hidden", hideSidebar || state.displayMode !== "match");
+      
+      // LEFT LEADERBOARD VISIBILITY: ONLY VISIBLE DURING MATCH
+      const hideSidebar = state.displayMode !== "match";
+      sidebar.classList.toggle("hidden", hideSidebar);
 
       const sidebarList = document.getElementById("sidebar-list");
-      const sortedTeams = [...state.teams].sort((a,b) => b.score - a.score || a.order - b.order);
       
-      sidebarList.style.height = (state.teams.length * 60) + "px";
+      // ONLY SHOW ACTIVE TEAMS ON LEADERBOARDS
+      const activeTeams = state.teams.filter(t => t.qualified);
+      const sortedTeams = activeTeams.sort((a,b) => b.score - a.score || (b.isMatchWinner ? 1 : 0) - (a.isMatchWinner ? 1 : 0) || a.order - b.order);
+      
+      sidebarList.style.height = (activeTeams.length * 60) + "px";
 
       state.teams.forEach(team => {
         let el = document.getElementById(`side-tile-${team.order}`);
+        
+        // Hide eliminated teams from the sidebar
+        if (!team.qualified) {
+            if (el) el.style.display = "none";
+            return;
+        }
+
         if (!el) {
           el = document.createElement("div");
           el.id = `side-tile-${team.order}`;
           el.className = "team-tile";
           sidebarList.appendChild(el);
         }
+        
+        el.style.display = ""; // Ensure it's visible if qualified
         const rank = sortedTeams.findIndex(t => t.order === team.order);
         el.style.top = `${rank * 60}px`;
         el.innerHTML = `<span>${team.name}</span><strong>${team.score}</strong>`;
@@ -239,6 +253,7 @@
         spacer.style.height = (sortedTeams.length * 75) + "px";
         container.appendChild(spacer);
 
+        // Populate Main Leaderboard with Active Teams Only
         sortedTeams.forEach((team, i) => {
           const tile = document.createElement("div");
           tile.className = "full-tile";
@@ -269,24 +284,31 @@
       }
 
       if (state.displayMode === "podium") {
-        const sorted = [...state.teams].sort((a,b) => b.score - a.score || a.order - b.order);
+        // Podium ranks ALL teams based on when they were eliminated, then score
+        const podiumSorted = [...state.teams].sort((a,b) => {
+            const aRank = a.qualified ? 99 : (a.eliminatedRound || 0);
+            const bRank = b.qualified ? 99 : (b.eliminatedRound || 0);
+            if (aRank !== bRank) return bRank - aRank;
+            return b.score - a.score || (b.isMatchWinner ? 1 : 0) - (a.isMatchWinner ? 1 : 0) || a.order - b.order;
+        });
+
         const podiumDisplay = document.getElementById("podium-display");
         
         podiumDisplay.innerHTML = `
           <div id="step-silver" class="podium-step step-2">
             <div class="podium-rank-label">🥈</div>
-            <div class="podium-name">${sorted[1]?.name || "-"}</div>
-            <div class="podium-score">${sorted[1]?.score || 0} PTS</div>
+            <div class="podium-name">${podiumSorted[1]?.name || "-"}</div>
+            <div class="podium-score">${podiumSorted[1]?.score || 0} PTS</div>
           </div>
           <div id="step-gold" class="podium-step step-1">
             <div class="podium-rank-label">🥇</div>
-            <div class="podium-name">${sorted[0]?.name || "-"}</div>
-            <div class="podium-score">${sorted[0]?.score || 0} PTS</div>
+            <div class="podium-name">${podiumSorted[0]?.name || "-"}</div>
+            <div class="podium-score">${podiumSorted[0]?.score || 0} PTS</div>
           </div>
           <div id="step-bronze" class="podium-step step-3">
             <div class="podium-rank-label">🥉</div>
-            <div class="podium-name">${sorted[2]?.name || "-"}</div>
-            <div class="podium-score">${sorted[2]?.score || 0} PTS</div>
+            <div class="podium-name">${podiumSorted[2]?.name || "-"}</div>
+            <div class="podium-score">${podiumSorted[2]?.score || 0} PTS</div>
           </div>
         `;
 
@@ -338,5 +360,6 @@
       setTimeout(() => { pieces = []; ctx.clearRect(0,0,canvas.width, canvas.height); }, 8000);
     }
   </script>
+
 </body>
 </html>
