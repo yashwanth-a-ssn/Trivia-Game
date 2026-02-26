@@ -208,7 +208,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // --- UNIVERSAL SORTING LOGIC ---
-  // Hierarchy: Score > Total Questions Won > Match Winner Status > Original Registration Order
   const teamSortFn = (a, b) => b.score - a.score || b.totalQuestionsWon - a.totalQuestionsWon || (b.isMatchWinner ? 1 : 0) - (a.isMatchWinner ? 1 : 0) || a.order - b.order;
 
   // --- UI NAVIGATION ---
@@ -401,7 +400,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const qInput = document.getElementById("questionsPerMatchInput");
     STATE.questionsPerMatch = parseInt(qInput.value) || 1;
 
-    // 1. Process Eliminations from the Previous Round (If Applicable)
+    // Process Eliminations
     if (STATE.round > 1) {
         const prevLimit = ADVANCEMENT[STATE.round - 1];
         const prevActiveTeams = STATE.teams.filter(t => t.qualified);
@@ -416,7 +415,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    let rLog = `Round: ${ROUND_NAMES[STATE.round]}\n\nQuestion List: ${STATE.qFileName || "Unknown"}\n\n`;
+    let rLog = `Round: ${ROUND_NAMES[STATE.round]}\n\n\nQuestion List: ${STATE.qFileName || "Unknown"}\n\n`;
     await appendToLog(rLog);
 
     STATE.matchIndex = 0;
@@ -429,8 +428,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if(activeTeams[i+1]) STATE.pairs.push([activeTeams[i], activeTeams[i+1]]);
     }
 
-    // RESET SCORES FOR NEW ROUND (Only for teams still playing!)
-    // NOTE: totalQuestionsWon is intentionally NOT reset to keep global track.
+    // RESET SCORES FOR NEW ROUND
     STATE.teams.forEach(t => {
         if (t.qualified) {
             t.score = 0;
@@ -467,13 +465,13 @@ document.addEventListener("DOMContentLoaded", () => {
     
     document.getElementById("nextQuestionBtn").classList.add("hidden");
     document.getElementById("endRoundBtn").classList.add("hidden");
-    document.getElementById("matchQCounter").textContent = `Question No: ${STATE.currentMatchQuestionNum}/${STATE.questionsPerMatch}`;
+    document.getElementById("matchQCounter").textContent = `Face-Off: ${STATE.currentMatchQuestionNum}/${STATE.questionsPerMatch}`;
     
     if (STATE.currentMatchQuestionNum === 1) {
         const pair = STATE.pairs[STATE.matchIndex];
-        appendToLog(`Match: ${pair[0].name} Vs ${pair[1].name}\nQuestion: ${STATE.currentQuestion.question}\n\n`);
+        appendToLog(`Match: ${pair[0].name} Vs ${pair[1].name}\n\nFace-Off: ${STATE.currentMatchQuestionNum} / ${STATE.questionsPerMatch}\nQuestion: ${STATE.currentQuestion.question}\n\n`);
     } else {
-        appendToLog(`Question: ${STATE.currentQuestion.question}\n\n`);
+        appendToLog(`Face-Off: ${STATE.currentMatchQuestionNum} / ${STATE.questionsPerMatch}\nQuestion: ${STATE.currentQuestion.question}\n\n`);
     }
 
     saveState(STATE);
@@ -570,7 +568,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       const winnerObj = STATE.teams.find(t => t.name === STATE.matchWinner);
-      if (winnerObj) winnerObj.isMatchWinner = true; // Mark Match Winner for Leaderboard Tie-breakers
+      if (winnerObj) winnerObj.isMatchWinner = true; 
 
       const winnerTotal = winnerObj ? winnerObj.score : 0;
 
@@ -599,7 +597,6 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("endRoundBtn").onclick = async () => {
     resetStatusUI();
     
-    // Determine who *will* be selected without officially eliminating them yet (for the leaderboard display)
     const limit = ADVANCEMENT[STATE.round];
     const activeTeams = STATE.teams.filter(t => t.qualified);
     const sortedForLog = activeTeams.sort(teamSortFn);

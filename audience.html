@@ -182,6 +182,9 @@
 
   <script src="sync.js"></script>
   <script>
+    // HARD HIDE ON LOAD: Guarantees it won't flash on the welcome screen
+    document.getElementById("leaderboard-sidebar").style.display = "none";
+
     let lastRevealed = 0;
     const ROUND_NAMES = { 1: "Qualifiers", 2: "Quarterfinals", 3: "Semifinals", 4: "Finals" };
 
@@ -191,14 +194,13 @@
     listen(state => {
       const sidebar = document.getElementById("leaderboard-sidebar");
       
-      // EXPLICIT HIDE: Forces the sidebar completely off the screen immediately if not matching.
-      const hideSidebar = state.displayMode !== "match";
-      sidebar.classList.toggle("hidden", hideSidebar);
-      sidebar.style.display = hideSidebar ? "none" : "block"; // Extra safeguard for Welcome screen!
+      // EXPLICIT VISIBILITY TOGGLE
+      const isMatch = state.displayMode === "match";
+      sidebar.classList.toggle("hidden", !isMatch);
+      sidebar.style.display = isMatch ? "block" : "none"; // Hard CSS override based on state
 
       const sidebarList = document.getElementById("sidebar-list");
       
-      // ONLY SHOW ACTIVE TEAMS ON LEADERBOARDS
       const activeTeams = state.teams.filter(t => t.qualified);
       const sortedTeams = activeTeams.sort(teamSortFn);
       
@@ -207,7 +209,6 @@
       state.teams.forEach(team => {
         let el = document.getElementById(`side-tile-${team.order}`);
         
-        // Hide eliminated teams from the sidebar
         if (!team.qualified) {
             if (el) el.style.display = "none";
             return;
@@ -220,7 +221,7 @@
           sidebarList.appendChild(el);
         }
         
-        el.style.display = ""; // Ensure it's visible if qualified
+        el.style.display = ""; 
         const rank = sortedTeams.findIndex(t => t.order === team.order);
         el.style.top = `${rank * 60}px`;
         el.innerHTML = `<span>${team.name}</span><strong>${team.score}</strong>`;
@@ -257,7 +258,6 @@
         spacer.style.height = (sortedTeams.length * 75) + "px";
         container.appendChild(spacer);
 
-        // Populate Main Leaderboard with Active Teams Only
         sortedTeams.forEach((team, i) => {
           const tile = document.createElement("div");
           tile.className = "full-tile";
@@ -288,7 +288,6 @@
       }
 
       if (state.displayMode === "podium") {
-        // Podium ranks ALL teams based on when they were eliminated, then score
         const podiumSorted = [...state.teams].sort((a,b) => {
             const aRank = a.qualified ? 99 : (a.eliminatedRound || 0);
             const bRank = b.qualified ? 99 : (b.eliminatedRound || 0);
