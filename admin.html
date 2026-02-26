@@ -189,7 +189,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const ROUND_NAMES = { 1: "Qualifiers", 2: "Quarterfinals", 3: "Semifinals", 4: "Finals" };
   const ROUND_Q_COUNTS = { 2: 3, 3: 5, 4: 5 };
   const ADVANCEMENT = { 1: 8, 2: 4, 3: 2, 4: 1 };
-  const HR = "--------------------------------------------------------------------------------------------------------------\n";
+  const HR = "-------------------------------------------------------------------------------------------\n";
 
   // --- LOGGING ENGINE (WITH PROMISE QUEUE) ---
   let fileHandle = null;
@@ -427,7 +427,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    let rLog = `Round: ${ROUND_NAMES[STATE.round]}\n\n\nQuestion List: ${STATE.qFileName || "Unknown"}\n\n`;
+    let rLog = `Round: ${ROUND_NAMES[STATE.round]}\n\nNo Of Questions: ${STATE.questionsPerMatch}\n\n\nQuestion List: ${STATE.qFileName || "Unknown"}\n\n`;
     await appendToLog(rLog);
 
     STATE.matchIndex = 0;
