@@ -149,6 +149,7 @@
     <div id="screen-match" class="screen hidden">
       <h2 id="round-name"></h2>
       <h1 id="match-up"></h1>
+      <h3 id="audience-q-counter" style="color: var(--gold); font-size: 1.5rem; margin-top: -10px; margin-bottom: 15px;"></h3>
       <h3 id="active-q"></h3>
       <div id="board">
         <div class="answer-box" id="ans-0"></div>
@@ -182,22 +183,19 @@
 
   <script src="sync.js"></script>
   <script>
-    // HARD HIDE ON LOAD: Guarantees it won't flash on the welcome screen
     document.getElementById("leaderboard-sidebar").style.display = "none";
 
     let lastRevealed = 0;
     const ROUND_NAMES = { 1: "Qualifiers", 2: "Quarterfinals", 3: "Semifinals", 4: "Finals" };
 
-    // Hierarchy Sort: Score > Total Questions Won > Match Winner Status > Order
     const teamSortFn = (a, b) => b.score - a.score || b.totalQuestionsWon - a.totalQuestionsWon || (b.isMatchWinner ? 1 : 0) - (a.isMatchWinner ? 1 : 0) || a.order - b.order;
 
     listen(state => {
       const sidebar = document.getElementById("leaderboard-sidebar");
       
-      // EXPLICIT VISIBILITY TOGGLE
       const isMatch = state.displayMode === "match";
       sidebar.classList.toggle("hidden", !isMatch);
-      sidebar.style.display = isMatch ? "block" : "none"; // Hard CSS override based on state
+      sidebar.style.display = isMatch ? "block" : "none"; 
 
       const sidebarList = document.getElementById("sidebar-list");
       
@@ -273,6 +271,7 @@
         document.getElementById("round-name").textContent = ROUND_NAMES[state.round];
         const pair = state.pairs[state.matchIndex];
         document.getElementById("match-up").textContent = pair ? `${pair[0].name} vs ${pair[1].name}` : "";
+        document.getElementById("audience-q-counter").textContent = `Question: ${state.currentMatchQuestionNum} / ${state.questionsPerMatch}`;
         document.getElementById("active-q").textContent = state.currentQuestion?.question || "";
         
         state.currentQuestion?.answers.forEach((a, i) => {

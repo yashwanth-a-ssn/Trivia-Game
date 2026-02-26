@@ -159,6 +159,7 @@
   <h2>Podium Control</h2>
   <div id="admin-podium-preview"></div>
   <button id="btnDisplayPodium" class="display-btn">Display Podium to Audience</button>
+  <button id="endGameBtn" class="hidden" style="background: #ef4444; color: white; margin-top: 15px; font-size: 1.2rem; padding: 15px; width: 100%; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">Complete Game & Save Log</button>
 </div>
 
 <script src="sync.js"></script>
@@ -181,7 +182,8 @@ document.addEventListener("DOMContentLoaded", () => {
     questionsPerMatch: 1,
     currentMatchQuestionNum: 0,
     matchQuestionWins: [0, 0],
-    firstQuestionWinnerIdx: null
+    firstQuestionWinnerIdx: null,
+    gameComplete: false
   };
 
   const ROUND_NAMES = { 1: "Qualifiers", 2: "Quarterfinals", 3: "Semifinals", 4: "Finals" };
@@ -231,16 +233,17 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("start-section").classList.toggle("hidden", !hasData);
         
         const qInput = document.getElementById("questionsPerMatchInput");
-        if (STATE.round === 1) {
-            qInput.disabled = false;
-        } else {
+        if (STATE.round > 1) {
             qInput.value = ROUND_Q_COUNTS[STATE.round];
-            qInput.disabled = true;
         }
+        qInput.disabled = false; // Always enabled so Admin can override default
     }
 
     if(id === "view-leaderboard") updateAdminLeaderboard();
-    if(id === "view-podium") updateAdminPodium(); 
+    if(id === "view-podium") {
+        updateAdminPodium(); 
+        document.getElementById("endGameBtn").classList.toggle("hidden", !STATE.gameComplete);
+    }
 
     document.querySelectorAll('.nav-btn').forEach(btn => {
         btn.classList.toggle('active-tab', btn.textContent === tabName || btn.id.includes(id.split('-')[1]));
@@ -313,6 +316,14 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("btnDisplayLeaderboard").onclick = () => { STATE.displayMode = "leaderboard"; broadcast(STATE); saveState(STATE); };
   document.getElementById("btnDisplayPodium").onclick = () => { STATE.displayMode = "podium"; broadcast(STATE); saveState(STATE); };
 
+  // END GAME BUTTON LOGIC
+  document.getElementById("endGameBtn").onclick = async () => {
+      await appendToLog(`\n${HR}\n*** GAME COMPLETE ***\n${HR}\n`);
+      fileHandle = null; 
+      alert("Game Complete! Log file saved and closed successfully.");
+      document.getElementById("endGameBtn").classList.add("hidden");
+  };
+
   // NEW GAME
   document.getElementById("newGameBtn").onclick = async () => {
     if (!window.showSaveFilePicker) return alert("Please use Chrome or Edge for File Access.");
@@ -333,7 +344,8 @@ document.addEventListener("DOMContentLoaded", () => {
         questionsPool: [], currentQuestion: null, revealed: [], 
         isMatchLive: false, matchWinner: null, matchScores: [0, 0],
         questionsPerMatch: 1, currentMatchQuestionNum: 0, 
-        matchQuestionWins: [0, 0], firstQuestionWinnerIdx: null
+        matchQuestionWins: [0, 0], firstQuestionWinnerIdx: null,
+        gameComplete: false
       };
 
       showView("view-rules", "Rules");
@@ -465,7 +477,7 @@ document.addEventListener("DOMContentLoaded", () => {
     
     document.getElementById("nextQuestionBtn").classList.add("hidden");
     document.getElementById("endRoundBtn").classList.add("hidden");
-    document.getElementById("matchQCounter").textContent = `Face-Off: ${STATE.currentMatchQuestionNum}/${STATE.questionsPerMatch}`;
+    document.getElementById("matchQCounter").textContent = `Question: ${STATE.currentMatchQuestionNum} / ${STATE.questionsPerMatch}`;
     
     if (STATE.currentMatchQuestionNum === 1) {
         const pair = STATE.pairs[STATE.matchIndex];
@@ -622,6 +634,7 @@ document.addEventListener("DOMContentLoaded", () => {
             STATE.questionsPool = [];
             showView("view-leaderboard", "Leaderboard");
         } else {
+            STATE.gameComplete = true; // Unlock End Game button
             showView("view-podium", "Podium");
             const podiumSorted = [...STATE.teams].sort((a,b) => {
                 const aRank = a.qualified ? 99 : (a.eliminatedRound || 0);
