@@ -17,6 +17,10 @@ Round: <RoundName>
 Question List: <Question List File name uploaded>
 
 Match: <Team 1 Name> Vs <Team 2 Name>
+
+// The below part should be repeated in case of more than 1 face off
+// The below is Current face off number / total no of face off assigned.
+Face-Off: Current / Total 
 Question: <Current Question>
 
 <Answer No>) <Answer 1> : <Team Name or Empty Reveal> -> <Points Awarded>
@@ -25,6 +29,7 @@ Question: <Current Question>
 <Answer No>) <Answer 4> : <Team Name or Empty Reveal> -> <Points Awarded>
 <Answer No>) <Answer 5> : <Team Name or Empty Reveal> -> <Points Awarded>
 
+// End of repetition part
 <Team 1 Name> => <Current Match Points> Points
 <Team 2 Name> => <Current Match Points> Points
 Winner: <Winning Team Name> => <Cumulative Points> Points

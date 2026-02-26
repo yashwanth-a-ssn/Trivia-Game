@@ -189,7 +189,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const ADVANCEMENT = { 1: 8, 2: 4, 3: 2, 4: 1 };
   const HR = "--------------------------------------------------------------------------------------------------------------\n";
 
-  // --- LOGGING ENGINE (WITH PROMISE QUEUE TO FIX SYNC ISSUES) ---
+  // --- LOGGING ENGINE (WITH PROMISE QUEUE) ---
   let fileHandle = null;
   let logQueue = Promise.resolve();
 
@@ -206,6 +206,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     return logQueue;
   }
+
+  // --- UNIVERSAL SORTING LOGIC ---
+  // Hierarchy: Score > Total Questions Won > Match Winner Status > Original Registration Order
+  const teamSortFn = (a, b) => b.score - a.score || b.totalQuestionsWon - a.totalQuestionsWon || (b.isMatchWinner ? 1 : 0) - (a.isMatchWinner ? 1 : 0) || a.order - b.order;
 
   // --- UI NAVIGATION ---
   function resetStatusUI() {
@@ -247,8 +251,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function updateAdminLeaderboard() {
     const list = document.getElementById("admin-leaderboard-list");
     const activeTeams = STATE.teams.filter(t => t.qualified);
-    // Sort by Score DESC -> then by Match Win Advantage -> then by Original Order
-    const sorted = activeTeams.sort((a,b) => b.score - a.score || (b.isMatchWinner ? 1 : 0) - (a.isMatchWinner ? 1 : 0) || a.order - b.order);
+    const sorted = activeTeams.sort(teamSortFn);
     
     list.innerHTML = sorted.map((t, i) => `
       <div class="admin-lb-item"><span>#${i+1} ${t.name}</span><strong>${t.score} PTS</strong></div>
@@ -257,12 +260,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function updateAdminPodium() {
     const preview = document.getElementById("admin-podium-preview");
-    // Podium needs ALL teams, ranked by Elimination Round first, then Score/TieBreakers
     const sorted = [...STATE.teams].sort((a,b) => {
         const aRank = a.qualified ? 99 : (a.eliminatedRound || 0);
         const bRank = b.qualified ? 99 : (b.eliminatedRound || 0);
         if (aRank !== bRank) return bRank - aRank;
-        return b.score - a.score || (b.isMatchWinner ? 1 : 0) - (a.isMatchWinner ? 1 : 0) || a.order - b.order;
+        return teamSortFn(a, b);
     });
 
     preview.innerHTML = `
@@ -359,10 +361,13 @@ document.addEventListener("DOMContentLoaded", () => {
       const teamData = rows.slice(1).filter(r => r[0] && r[0].trim() !== "");
       if (teamData.length % 2 !== 0) return alert("Even number of teams required.");
       
-      STATE.teams = teamData.map((r, i) => ({ name: r[0].trim(), score: 0, order: i, qualified: true, eliminatedRound: null, isMatchWinner: false }));
+      STATE.teams = teamData.map((r, i) => ({ 
+          name: r[0].trim(), score: 0, order: i, qualified: true, 
+          eliminatedRound: null, isMatchWinner: false, totalQuestionsWon: 0 
+      }));
       document.getElementById("teams-list-admin").innerHTML = STATE.teams.map(t => `<div>• ${t.name}</div>`).join("");
       
-      let teamLog = `Teams:\nTeam List: ${file.name}\n\n` + STATE.teams.map(t => t.name).join("\n") + `\n\n${HR}\n`;
+      let teamLog = `Team List: ${file.name}\n\nTeams:\n\n` + STATE.teams.map(t => t.name).join("\n") + `\n\n${HR}\n`;
       appendToLog(teamLog);
       updateTaskbar(); saveState(STATE);
     });
@@ -396,17 +401,28 @@ document.addEventListener("DOMContentLoaded", () => {
     const qInput = document.getElementById("questionsPerMatchInput");
     STATE.questionsPerMatch = parseInt(qInput.value) || 1;
 
-    let rLog = `Round: ${ROUND_NAMES[STATE.round]}\n` +
-               `No of Questions for this Round per Match: ${STATE.questionsPerMatch}\n\n` +
-               `Question List: ${STATE.qFileName || "Unknown"}\n\n\n`;
+    // 1. Process Eliminations from the Previous Round (If Applicable)
+    if (STATE.round > 1) {
+        const prevLimit = ADVANCEMENT[STATE.round - 1];
+        const prevActiveTeams = STATE.teams.filter(t => t.qualified);
+        const sortedForElimination = prevActiveTeams.sort(teamSortFn);
+        
+        sortedForElimination.slice(prevLimit).forEach(t => {
+            const team = STATE.teams.find(orig => orig.name === t.name);
+            if (team) {
+                team.qualified = false;
+                team.eliminatedRound = STATE.round - 1;
+            }
+        });
+    }
+
+    let rLog = `Round: ${ROUND_NAMES[STATE.round]}\n\nQuestion List: ${STATE.qFileName || "Unknown"}\n\n`;
     await appendToLog(rLog);
 
     STATE.matchIndex = 0;
     
     // Pairing Active Teams Only
-    const activeTeams = STATE.teams
-        .filter(t => t.qualified)
-        .sort((a,b) => b.score - a.score || (b.isMatchWinner ? 1 : 0) - (a.isMatchWinner ? 1 : 0) || a.order - b.order);
+    const activeTeams = STATE.teams.filter(t => t.qualified).sort(teamSortFn);
 
     STATE.pairs = [];
     for(let i=0; i < activeTeams.length; i+=2) {
@@ -414,10 +430,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // RESET SCORES FOR NEW ROUND (Only for teams still playing!)
+    // NOTE: totalQuestionsWon is intentionally NOT reset to keep global track.
     STATE.teams.forEach(t => {
         if (t.qualified) {
             t.score = 0;
-            t.isMatchWinner = false; // Reset tie-breaker flag
+            t.isMatchWinner = false; 
         }
     });
 
@@ -454,10 +471,11 @@ document.addEventListener("DOMContentLoaded", () => {
     
     if (STATE.currentMatchQuestionNum === 1) {
         const pair = STATE.pairs[STATE.matchIndex];
-        appendToLog(`Match: ${pair[0].name} Vs ${pair[1].name}\n\n\n`);
+        appendToLog(`Match: ${pair[0].name} Vs ${pair[1].name}\nQuestion: ${STATE.currentQuestion.question}\n\n`);
+    } else {
+        appendToLog(`Question: ${STATE.currentQuestion.question}\n\n`);
     }
 
-    appendToLog(`Question No: ${STATE.currentMatchQuestionNum}/${STATE.questionsPerMatch}\nQuestion: ${STATE.currentQuestion.question}\n\n`);
     saveState(STATE);
   }
 
@@ -503,11 +521,14 @@ document.addEventListener("DOMContentLoaded", () => {
              if(pair[1].name === r.winnerName) qScores[1] += a.points;
         });
 
+        // Award Global Total Questions Won stat for the Tie-Breaker
         if (qScores[0] > qScores[1]) {
             STATE.matchQuestionWins[0]++;
+            STATE.teams.find(t => t.name === pair[0].name).totalQuestionsWon += 1;
             if(STATE.currentMatchQuestionNum === 1) STATE.firstQuestionWinnerIdx = 0;
         } else if (qScores[1] > qScores[0]) {
             STATE.matchQuestionWins[1]++;
+            STATE.teams.find(t => t.name === pair[1].name).totalQuestionsWon += 1;
             if(STATE.currentMatchQuestionNum === 1) STATE.firstQuestionWinnerIdx = 1;
         }
 
@@ -553,7 +574,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const winnerTotal = winnerObj ? winnerObj.score : 0;
 
-      let resultLog = `\n${pair[0].name} => ${STATE.matchScores[0]} Points\n` + 
+      let resultLog = `${pair[0].name} => ${STATE.matchScores[0]} Points\n` + 
                       `${pair[1].name} => ${STATE.matchScores[1]} Points\n` + 
                       `Winner: ${STATE.matchWinner} => ${winnerTotal} Points\n\n${HR}\n`;
       await appendToLog(resultLog);
@@ -578,22 +599,14 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("endRoundBtn").onclick = async () => {
     resetStatusUI();
     
+    // Determine who *will* be selected without officially eliminating them yet (for the leaderboard display)
     const limit = ADVANCEMENT[STATE.round];
     const activeTeams = STATE.teams.filter(t => t.qualified);
-    const sorted = activeTeams.sort((a,b) => b.score - a.score || (b.isMatchWinner ? 1 : 0) - (a.isMatchWinner ? 1 : 0) || a.order - b.order);
+    const sortedForLog = activeTeams.sort(teamSortFn);
     
-    // Mark Newly Eliminated Teams
-    sorted.slice(limit).forEach(t => {
-        const team = STATE.teams.find(orig => orig.name === t.name);
-        if (team) {
-            team.qualified = false;
-            team.eliminatedRound = STATE.round; // Remember when they lost to score 3rd place!
-        }
-    });
-
     let lbLog = `${ROUND_NAMES[STATE.round]} Over\n\n${HR}\nLeaderBoard:\n`;
-    sorted.forEach((t, i) => {
-        lbLog += `${i+1}) ${t.name} : ${t.score} => (${t.qualified ? 'Selected' : 'Eliminated'})\n`;
+    sortedForLog.forEach((t, i) => {
+        lbLog += `${i+1}) ${t.name} : ${t.score} => (${i < limit ? 'Selected' : 'Eliminated'})\n`;
     });
     lbLog += `\n${HR}\n`;
     await appendToLog(lbLog);
@@ -617,7 +630,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const aRank = a.qualified ? 99 : (a.eliminatedRound || 0);
                 const bRank = b.qualified ? 99 : (b.eliminatedRound || 0);
                 if (aRank !== bRank) return bRank - aRank;
-                return b.score - a.score || (b.isMatchWinner ? 1 : 0) - (a.isMatchWinner ? 1 : 0) || a.order - b.order;
+                return teamSortFn(a, b);
             });
             let pod = `Game Winners\nFirst: ${podiumSorted[0].name} : ${podiumSorted[0].score} Points\nSecond: ${podiumSorted[1].name} : ${podiumSorted[1].score} Points\nThird: ${podiumSorted[2].name} : ${podiumSorted[2].score} Points\n\n${HR}\n`;
             await appendToLog(pod);

@@ -185,18 +185,22 @@
     let lastRevealed = 0;
     const ROUND_NAMES = { 1: "Qualifiers", 2: "Quarterfinals", 3: "Semifinals", 4: "Finals" };
 
+    // Hierarchy Sort: Score > Total Questions Won > Match Winner Status > Order
+    const teamSortFn = (a, b) => b.score - a.score || b.totalQuestionsWon - a.totalQuestionsWon || (b.isMatchWinner ? 1 : 0) - (a.isMatchWinner ? 1 : 0) || a.order - b.order;
+
     listen(state => {
       const sidebar = document.getElementById("leaderboard-sidebar");
       
-      // LEFT LEADERBOARD VISIBILITY: ONLY VISIBLE DURING MATCH
+      // EXPLICIT HIDE: Forces the sidebar completely off the screen immediately if not matching.
       const hideSidebar = state.displayMode !== "match";
       sidebar.classList.toggle("hidden", hideSidebar);
+      sidebar.style.display = hideSidebar ? "none" : "block"; // Extra safeguard for Welcome screen!
 
       const sidebarList = document.getElementById("sidebar-list");
       
       // ONLY SHOW ACTIVE TEAMS ON LEADERBOARDS
       const activeTeams = state.teams.filter(t => t.qualified);
-      const sortedTeams = activeTeams.sort((a,b) => b.score - a.score || (b.isMatchWinner ? 1 : 0) - (a.isMatchWinner ? 1 : 0) || a.order - b.order);
+      const sortedTeams = activeTeams.sort(teamSortFn);
       
       sidebarList.style.height = (activeTeams.length * 60) + "px";
 
@@ -289,7 +293,7 @@
             const aRank = a.qualified ? 99 : (a.eliminatedRound || 0);
             const bRank = b.qualified ? 99 : (b.eliminatedRound || 0);
             if (aRank !== bRank) return bRank - aRank;
-            return b.score - a.score || (b.isMatchWinner ? 1 : 0) - (a.isMatchWinner ? 1 : 0) || a.order - b.order;
+            return teamSortFn(a, b);
         });
 
         const podiumDisplay = document.getElementById("podium-display");
