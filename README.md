@@ -55,7 +55,7 @@ Open `audience.html`, scroll to approximately line 98, and locate this block:
     </div>
 </div>
 ```
-Simply edit the "Wolfrahh Studios Presents" for Presenter Name.
+Replace "Wolfrahh Studios Presents" with the presenter's name.
 
 ### **2. Preparation**
 The system uses `.csv` files for data management. Prepare your files based on these samples:
