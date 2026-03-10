@@ -34,10 +34,29 @@ Before your event, you can personalize the opening title screen.
 Open `audience.html`, scroll to approximately line 98, and locate this block:
 ```html
 <div id="screen-welcome" class="screen">
-      <h1 style="font-size: 4rem;">Wolfrahh Presents:</h1>
-      <h1 style="font-size: 4rem;">Family Feud - Trivia Game🎉</h1>
+    <div class="rules-card" style="text-align: center; padding: 80px 40px; display: inline-block; width: 80%;">
+    
+    <h2 style="font-size: 2.5rem; color: var(--accent); text-transform: uppercase; letter-spacing: 8px; font-weight: 400; margin-bottom: 20px; text-shadow: 0 0 15px rgba(255,0,60,0.4);">
+        
+        Wolfrahh Studios Presents
+    </h2>
+    
+    <div style="height: 1px; background: linear-gradient(90deg, transparent, var(--accent), transparent); width: 70%; margin: 0 auto 40px auto; opacity: 0.6; box-shadow: 0 0 10px var(--accent);"></div>
+    
+    <h1 style="font-size: 5.5rem; margin: 0; font-weight: 800; letter-spacing: 2px; color: white; text-shadow: 0 10px 30px rgba(0,0,0,0.8), 0 0 20px rgba(255,255,255,0.2);">
+        
+        Family Feud
+    </h1>
+    
+    <h3 style="font-size: 3rem; color: var(--accent); margin-top: 15px; font-weight: 300; text-transform: uppercase; letter-spacing: 5px; text-shadow: 0 0 15px rgba(255,0,60,0.4);">
+        
+        Trivia Game 🎉
+    </h3>
+    </div>
 </div>
 ```
+Simple edit the "Woldrahh Studios Presents" for Presenter Name.
+
 ### **2. Preparation**
 The system uses `.csv` files for data management. Prepare your files based on these samples:
 
