@@ -39,7 +39,7 @@ Winner: <Winning Team Name> => <Cumulative Points> Points
 
 -------------------------------------------------------------------------------------------
 
-LeaderBoard:
+Leader Board:
 1) <TeamName> : <Points> => (Selected)
 ...
 9) <TeamName> : <Points> => (Eliminated)

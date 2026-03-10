@@ -20,7 +20,7 @@
     #admin-leaderboard-list {
       text-align: left;
       max-height: 300px;
-      background: rgba(0,0,0,0.2);
+      background: rgba(0,0,0,0.3);
       padding: 15px;
       border-radius: 8px;
       margin-bottom: 15px;
@@ -29,7 +29,7 @@
       display: flex;
       justify-content: space-between;
       padding: 8px 0;
-      border-bottom: 1px solid rgba(245, 197, 66, 0.2);
+      border-bottom: 1px solid rgba(255, 0, 60, 0.2);
     }
     #admin-podium-preview {
       display: flex;
@@ -38,22 +38,19 @@
       gap: 15px;
       margin-bottom: 20px;
       padding: 20px;
-      background: rgba(255,255,255,0.05);
+      background: rgba(0,0,0,0.5);
       border-radius: 10px;
+      border: 1px solid rgba(255,0,60,0.2);
     }
     .admin-podium-slot {
       display: flex;
       flex-direction: column;
       align-items: center;
       padding: 10px;
-      border: 1px solid var(--gold);
+      border: 1px solid var(--accent);
+      background: rgba(255,0,60,0.05);
       border-radius: 8px;
       width: 120px;
-    }
-    .nav-btn.active-tab {
-      background: var(--gold);
-      color: black;
-      font-weight: bold;
     }
   </style>
 </head>
@@ -76,7 +73,7 @@
 <h1>Trivia Admin Control</h1>
 
 <div id="view-home" class="card">
-  <input type="text" id="gameNameInput" placeholder="Enter Game Name" style="font-size: 1.2rem; padding: 10px; margin-bottom: 20px; width: 80%; max-width: 400px; display: block; margin-left: auto; margin-right: auto; text-align: center; border-radius: 5px; border: 1px solid #ccc;">
+  <input type="text" id="gameNameInput" placeholder="Enter Game Name" style="font-size: 1.2rem; padding: 10px; margin-bottom: 20px; width: 80%; max-width: 400px; display: block; margin-left: auto; margin-right: auto; text-align: center; border-radius: 5px; border: 1px solid rgba(255,0,60,0.5); background: rgba(0,0,0,0.5); color: white;">
   <button id="newGameBtn" style="font-size: 1.5rem; padding: 20px;">New Game</button>
 </div>
 
@@ -113,7 +110,7 @@
   <h2>Teams Management</h2>
   <div id="setup-inputs">
     <p>Upload <strong>Teams.csv</strong> (First row must be "Teams")</p>
-    <input type="file" id="teamsFile" accept=".csv">
+    <input type="file" id="teamsFile" accept=".csv" style="color: white;">
   </div>
   <div id="teams-list-admin" style="margin: 15px 0; text-align: left; max-height: 200px;"></div>
   <button id="btnDisplayTeams" class="display-btn">Display Teams to Audience</button>
@@ -124,28 +121,28 @@
   
   <div id="q-config-section" style="margin-bottom: 20px;">
     <label>Questions Per Match: </label>
-    <input type="number" id="questionsPerMatchInput" value="1" min="1" style="width: 60px; padding: 5px; font-size: 1.2rem; text-align: center;">
+    <input type="number" id="questionsPerMatchInput" value="1" min="1" style="width: 60px; padding: 5px; font-size: 1.2rem; text-align: center; background: #111; color: white; border: 1px solid var(--accent); border-radius: 5px;">
   </div>
 
   <div id="upload-section">
     <label id="qLabel">Upload Questions CSV (Header: Question,Answer,Points)</label><br>
-    <input type="file" id="questionsFile" accept=".csv">
+    <input type="file" id="questionsFile" accept=".csv" style="color: white; margin-top: 10px;">
   </div>
   <div id="start-section" class="hidden">
-    <button id="startRoundBtn" style="background: #22c55e; color: white; font-size: 1.2rem;">Start Round</button>
+    <button id="startRoundBtn" style="background: #00ff66; color: black; font-size: 1.2rem; box-shadow: 0 0 15px rgba(0,255,102,0.4);">Start Round</button>
   </div>
 </div>
 
 <div id="view-match" class="card hidden">
-  <div id="admin-status" style="background: #f5c542; color: #000; padding: 5px; font-weight: bold; margin-bottom: 10px;">ADMIN PREVIEW - NOT ON AUDIENCE</div>
+  <div id="admin-status" style="background: var(--accent); color: white; padding: 5px; font-weight: bold; margin-bottom: 10px; border-radius: 4px;">ADMIN PREVIEW - NOT ON AUDIENCE</div>
   <h2 id="matchHeader"></h2>
   <div id="matchQCounter" style="color: #aaa; font-size: 0.9rem; margin-bottom: 5px;"></div>
   <h3 id="questionText"></h3>
   <div id="answers"></div>
   <div class="controls">
-    <button id="btnDisplayMatch" class="display-btn" style="background: #3b82f6; color: white;">Display Match to Audience</button>
-    <button id="nextQuestionBtn">Next Question / Finish Match</button>
-    <button id="endRoundBtn" class="hidden" style="background: #ff4444; color: white;">Complete Round</button>
+    <button id="btnDisplayMatch" class="display-btn" style="background: #00e5ff; color: black; box-shadow: 0 0 15px rgba(0,229,255,0.4);">Display Match to Audience</button>
+    <button id="nextQuestionBtn" style="background: #333; border: 1px solid var(--accent);">Next Question / Finish Match</button>
+    <button id="endRoundBtn" class="hidden" style="background: #ef4444; color: white; box-shadow: 0 0 15px rgba(239,68,68,0.4);">Complete Round</button>
   </div>
 </div>
 
@@ -159,7 +156,7 @@
   <h2>Podium Control</h2>
   <div id="admin-podium-preview"></div>
   <button id="btnDisplayPodium" class="display-btn">Display Podium to Audience</button>
-  <button id="endGameBtn" class="hidden" style="background: #ef4444; color: white; margin-top: 15px; font-size: 1.2rem; padding: 15px; width: 100%; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">Complete Game & Save Log</button>
+  <button id="endGameBtn" class="hidden" style="background: #ef4444; color: white; margin-top: 15px; font-size: 1.2rem; padding: 15px; width: 100%; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; box-shadow: 0 0 15px rgba(239,68,68,0.4);">Complete Game & Save Log</button>
 </div>
 
 <script src="sync.js"></script>
@@ -191,7 +188,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const ADVANCEMENT = { 1: 8, 2: 4, 3: 2, 4: 1 };
   const HR = "-------------------------------------------------------------------------------------------\n";
 
-  // --- LOGGING ENGINE (WITH PROMISE QUEUE) ---
   let fileHandle = null;
   let logQueue = Promise.resolve();
 
@@ -209,15 +205,14 @@ document.addEventListener("DOMContentLoaded", () => {
     return logQueue;
   }
 
-  // --- UNIVERSAL SORTING LOGIC ---
   const teamSortFn = (a, b) => b.score - a.score || b.totalQuestionsWon - a.totalQuestionsWon || (b.isMatchWinner ? 1 : 0) - (a.isMatchWinner ? 1 : 0) || a.order - b.order;
 
-  // --- UI NAVIGATION ---
   function resetStatusUI() {
     const status = document.getElementById("admin-status");
     if(status) {
       status.textContent = "ADMIN PREVIEW - NOT ON AUDIENCE";
-      status.style.background = "#f5c542";
+      status.style.background = "var(--accent)";
+      status.style.color = "white";
     }
     STATE.isMatchLive = false;
   }
@@ -236,7 +231,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (STATE.round > 1) {
             qInput.value = ROUND_Q_COUNTS[STATE.round];
         }
-        qInput.disabled = false; // Always enabled so Admin can override default
+        qInput.disabled = false; 
     }
 
     if(id === "view-leaderboard") updateAdminLeaderboard();
@@ -288,7 +283,6 @@ document.addEventListener("DOMContentLoaded", () => {
     `;
   }
 
-  // --- INITIALIZATION & EVENTS ---
   if (STATE.teams.length > 0) {
     document.getElementById("taskbar").classList.remove("hidden");
     updateTaskbar();
@@ -316,7 +310,6 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("btnDisplayLeaderboard").onclick = () => { STATE.displayMode = "leaderboard"; broadcast(STATE); saveState(STATE); };
   document.getElementById("btnDisplayPodium").onclick = () => { STATE.displayMode = "podium"; broadcast(STATE); saveState(STATE); };
 
-  // END GAME BUTTON LOGIC
   document.getElementById("endGameBtn").onclick = async () => {
       await appendToLog(`\n${HR}\n*** GAME COMPLETE ***\n${HR}\n`);
       fileHandle = null; 
@@ -324,7 +317,6 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("endGameBtn").classList.add("hidden");
   };
 
-  // NEW GAME
   document.getElementById("newGameBtn").onclick = async () => {
     if (!window.showSaveFilePicker) return alert("Please use Chrome or Edge for File Access.");
     const gInput = document.getElementById("gameNameInput");
@@ -363,7 +355,6 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (err) { console.error(err); }
   };
 
-  // FILE PARSING
   document.getElementById("teamsFile").onchange = e => {
     const file = e.target.files[0];
     if(!file) return;
@@ -407,12 +398,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   };
 
-  // --- START ROUND LOGIC ---
   document.getElementById("startRoundBtn").onclick = async () => {
     const qInput = document.getElementById("questionsPerMatchInput");
     STATE.questionsPerMatch = parseInt(qInput.value) || 1;
 
-    // Process Eliminations
     if (STATE.round > 1) {
         const prevLimit = ADVANCEMENT[STATE.round - 1];
         const prevActiveTeams = STATE.teams.filter(t => t.qualified);
@@ -431,16 +420,12 @@ document.addEventListener("DOMContentLoaded", () => {
     await appendToLog(rLog);
 
     STATE.matchIndex = 0;
-    
-    // Pairing Active Teams Only
     const activeTeams = STATE.teams.filter(t => t.qualified).sort(teamSortFn);
-
     STATE.pairs = [];
     for(let i=0; i < activeTeams.length; i+=2) {
       if(activeTeams[i+1]) STATE.pairs.push([activeTeams[i], activeTeams[i+1]]);
     }
 
-    // RESET SCORES FOR NEW ROUND
     STATE.teams.forEach(t => {
         if (t.qualified) {
             t.score = 0;
@@ -453,14 +438,12 @@ document.addEventListener("DOMContentLoaded", () => {
     prepareMatchStart();
   };
 
-  // --- MATCH LOGIC ---
   function prepareMatchStart() {
     STATE.currentMatchQuestionNum = 0;
     STATE.matchScores = [0, 0]; 
     STATE.matchQuestionWins = [0, 0];
     STATE.firstQuestionWinnerIdx = null;
     STATE.matchWinner = null;
-    
     loadNextQuestionForMatch();
   }
 
@@ -497,9 +480,9 @@ document.addEventListener("DOMContentLoaded", () => {
       <div class="answer-row">
         <span>${ans.text} (${ans.points})</span>
         <div class="btn-group">
-          <button onclick="award(${i}, 0)">+ ${pair[0].name}</button>
-          <button onclick="award(${i}, 1)">+ ${pair[1].name}</button>
-          <button style="background: #94a3b8" onclick="award(${i}, null)">Empty Reveal</button>
+          <button style="background: rgba(255,255,255,0.1); border: 1px solid var(--accent); color: white;" onclick="award(${i}, 0)">+ ${pair[0].name}</button>
+          <button style="background: rgba(255,255,255,0.1); border: 1px solid var(--accent); color: white;" onclick="award(${i}, 1)">+ ${pair[1].name}</button>
+          <button style="background: #333; color: #aaa;" onclick="award(${i}, null)">Empty Reveal</button>
         </div>
       </div>
     `).join("");
@@ -531,7 +514,6 @@ document.addEventListener("DOMContentLoaded", () => {
              if(pair[1].name === r.winnerName) qScores[1] += a.points;
         });
 
-        // Award Global Total Questions Won stat for the Tie-Breaker
         if (qScores[0] > qScores[1]) {
             STATE.matchQuestionWins[0]++;
             STATE.teams.find(t => t.name === pair[0].name).totalQuestionsWon += 1;
@@ -559,14 +541,14 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("btnDisplayMatch").onclick = () => { 
     STATE.displayMode = "match"; STATE.isMatchLive = true; 
     document.getElementById("admin-status").textContent = "LIVE ON AUDIENCE";
-    document.getElementById("admin-status").style.background = "#22c55e";
+    document.getElementById("admin-status").style.background = "#00ff66";
+    document.getElementById("admin-status").style.color = "#000";
     broadcast(STATE); saveState(STATE);
   };
 
   async function finishMatch() {
       const pair = STATE.pairs[STATE.matchIndex];
       
-      // Determine Winner
       if (STATE.matchScores[0] > STATE.matchScores[1]) STATE.matchWinner = pair[0].name;
       else if (STATE.matchScores[1] > STATE.matchScores[0]) STATE.matchWinner = pair[1].name;
       else {
@@ -613,7 +595,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const activeTeams = STATE.teams.filter(t => t.qualified);
     const sortedForLog = activeTeams.sort(teamSortFn);
     
-    let lbLog = `${ROUND_NAMES[STATE.round]} Over\n\n${HR}\nLeaderBoard:\n`;
+    let lbLog = `${ROUND_NAMES[STATE.round]} Over\n\n${HR}\nLeader Board:\n`;
     sortedForLog.forEach((t, i) => {
         lbLog += `${i+1}) ${t.name} : ${t.score} => (${i < limit ? 'Selected' : 'Eliminated'})\n`;
     });
@@ -634,7 +616,7 @@ document.addEventListener("DOMContentLoaded", () => {
             STATE.questionsPool = [];
             showView("view-leaderboard", "Leaderboard");
         } else {
-            STATE.gameComplete = true; // Unlock End Game button
+            STATE.gameComplete = true; 
             showView("view-podium", "Podium");
             const podiumSorted = [...STATE.teams].sort((a,b) => {
                 const aRank = a.qualified ? 99 : (a.eliminatedRound || 0);
